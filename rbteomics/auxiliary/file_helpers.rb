@@ -11,7 +11,7 @@
 # import os
 # from abc import ABCMeta
 
-basestring = String
+Basestring = String
 
 require 'pandas'
 pd = Pandas
@@ -85,17 +85,17 @@ end
 
 # class _file_obj
 class File_obj
-  def initialize(f, mode, encoding: nil)
+  def initialize(f, mode, encoding=nil)
     __init__(f, mode, encoding)
   end
 
-  def __init__(f, mode, encoding: nil)
+  def __init__(f, mode, encoding=nil)
     @_file_spec = nil
     @mode = mode
-    if f.nil
+    if f.nil?
       @file = {r: 'gets', a: 'puts', w: 'warn'}[mode[0]]
       @_file_spec = nil
-    elsif f.instance_of?(basestring)
+    elsif f.instance_of?(Basestring)
       @file = File.open(f, mode)
       @file.set_encoding(encoding) if encoding.nil?.!
       @_file_spec = f
@@ -199,13 +199,16 @@ end
 
 # @add_metaclass(ABCMeta)
 class FileReader < IteratorContextManager
-  def initialize(source, **kwargs)
-    __init__(source, kwargs)
+  def initialize(...)
+    __init__(...)
   end
 
   def __init__(source, **kwargs)
     func = kwargs['parser_func']
-    super(*kwargs['args'], parser_func: func, **kwargs['kwargs'])
+    p [kwargs]
+    # super(*kwargs[:args], parser_func: func, **kwargs[:kwargs])
+    # super(*kwargs[:args], parser_func: func, **kwargs[:kwargs])
+    super(kwargs[:args], parser_func: func, **kwargs[:kwargs])
     @_pass_file = kwargs['pass_file']
     @_source_init = source
     @_mode = kwargs['mode']
@@ -215,9 +218,9 @@ class FileReader < IteratorContextManager
 
   def reset
     if self.respond_to?(:_source)
-      self._source.__exit__(nil, nil, nil)
+      @_source.__exit__(nil, nil, nil)
     end
-    self._source = _file_obj.new(@_source_init, @_mode, @_encoding)
+    @_source = File_obj.new(@_source_init, @_mode, @_encoding)
     begin
       if @_pass_file
         @_reader = _func(@_source, @_args, @_kwargs)
@@ -225,20 +228,20 @@ class FileReader < IteratorContextManager
         @_reader = _func(@_args, @kwargs)
       end
     rescue => exception
-      self._source.__exit__(exception.message, exception.backtrace)
+      @_source.__exit__(exception.message, exception.backtrace)
       raise
     end
   end
 
   def __exit__(*args, **kwargs)
-    _souce.__exit__(args, kwargs)
+    @_souce.__exit__(args, kwargs)
   end
 
   def __getattr__(attr)
     if attr == '_source'
       raise AttributeError.new
     end
-    return _source.respond_to?(:attr)
+    return @_source.respond_to?(:attr)
   end
 end
 
@@ -274,7 +277,7 @@ module IndexedReaderMixin
   def get_py_id(elem_id)
     index = @default_index
     if index.nil?
-      raise PyteomicsError('Access by ID requires building an offset index.')
+      raise PyteomicsError.new('Access by ID requires building an offset index.')
     end
     offsets = index[elem_id]
     _item_form_offsets(offsets)
@@ -288,7 +291,7 @@ module IndexedReaderMixin
     begin
       key = @default_index.from_index(i, false)
     rescue => exception
-      raise PyteomicsError('Positional access requires building an offset index.')
+      raise PyteomicsError.new('Positional access requires building an offset index.')
     end
     get_by_id(key)
   end
@@ -301,7 +304,7 @@ module IndexedReaderMixin
     begin
       keys = @default_index.from_slice(s, false)
     rescue => exception
-      raise PyteomicsError('Positional access requires building an offset index.')
+      raise PyteomicsError.new('Positional access requires building an offset index.')
     end
     get_by_ids(keys)
   end
@@ -315,20 +318,20 @@ module IndexedReaderMixin
   end
 
   def __getitem__(key)
-    return get_by_id(key) if key.instance_of?(basestring)
+    return get_by_id(key) if key.instance_of?(Basestring)
     return get_by_index(key) if key.instance_of?(Integer)
     if key.instance_of?(Sequence)
       return [] if key.!
       return get_by_indexes(key) if key[0].instance_of?(Integer)
-      return get_by_ids(key) if key[0].instance_of?(basestring)
+      return get_by_ids(key) if key[0].instance_of?(Basestring)
     end
     # if isinstance(key, slice):
     if key.instance_of?(Array)
       return get_by_index_slice(key) if key[0].instance_of?(Integer)
-      return get_by_key_slice(key) if key[0].instance_of?(basestring)
+      return get_by_key_slice(key) if key[0].instance_of?(Basestring)
       return self if key.nil?
     end
-    raise PyteomicsError("Unsupported query key: #{key}")
+    raise PyteomicsError.new("Unsupported query key: #{key}")
   end
 end
 
@@ -343,7 +346,7 @@ class RTLocator
 
   def _get_scan_by_time(time)
     if @_reader.default_index.!
-      raise PyteomicsError("This method requires the index. Please pass `use_index=True` during initialization")
+      raise .new("This method requires the index. Please pass `use_index=True` during initialization")
     end
 
     scan_ids = [@_reader.default_index]

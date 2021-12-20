@@ -19,6 +19,12 @@ end
 puts 'Cleaving the proteins with trypsin...'
 unique_peptides = Set.new
 Zlib::GzipReader.open('yeast.fasta.gz') do |gz|
+  gz.read.split('>').each_with_index do |x, i|
+    f = Bio::FastaFormat.new(x)
+    # puts f.definition
+    new_peptides = f.seq
+    p new_peptides
+  end
   # fasta.FASTA(gzfile).each do |description, sequence|
 
   # end
