@@ -11,19 +11,19 @@
 PY2 = false
 
 # _UNIT_CV_INTERN_TABLE = dict()
-@@_UNIT_CV_INTERN_TABLE = {}
+@_UNIT_CV_INTERN_TABLE = {}
 
 def clear_unit_cv_table()
-  @@_UNIT_CV_INTERN_TABLE.clear
+  @_UNIT_CV_INTERN_TABLE.clear
 end
 
 def _intern_unit_or_cv(unit_or_cv:)
   return nil if unit_or_cv.nil?
   begin
-    return @@_UNIT_CV_INTERN_TABLE[unit_or_cv]
+    return @_UNIT_CV_INTERN_TABLE[unit_or_cv]
   rescue => exception
-    @@_UNIT_CV_INTERN_TABLE[unit_or_cv] = unit_or_cv
-    return @@_UNIT_CV_INTERN_TABLE[unit_or_cv]
+    @_UNIT_CV_INTERN_TABLE[unit_or_cv] = unit_or_cv
+    return @_UNIT_CV_INTERN_TABLE[unit_or_cv]
   end
 end
 
