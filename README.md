@@ -6,11 +6,11 @@
 ```ruby
 gem "bio"
 ```
-`fasta` 形式は `biruby` を利用しています。
+`fasta` 形式は `bioruby` を利用しています。
 その他のファイル形式についての実装を計画中です。
 # 進捗状況
 
-[EXAMPLE 1: UNRAVELLING THE PEPTIDOME](https://pyteomics.readthedocs.io/en/latest/examples/example_fasta.html) の
+[EXAMPLE 1: UNRAVELLING THE PEPTIDOME - Pyteomics](https://pyteomics.readthedocs.io/en/latest/examples/example_fasta.html) の
 ```python
 print('Cleaving the proteins with trypsin...')
 unique_peptides = set()
