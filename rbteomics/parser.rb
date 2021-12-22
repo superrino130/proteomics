@@ -22,7 +22,7 @@ STD_labels = STD_amino_acids + [STD_nterm, STD_cterm]
 def is_term_mod(label)
   _nterm_mod = /[^-]+-$/
   _cterm_mod = /-[^-]+$/
-  _ntrem_mod.match(label) || !!_cterm_mod.match(label)
+  _nterm_mod.match(label) || !!_cterm_mod.match(label)
 end
 
 def match_modX(label)
@@ -35,7 +35,7 @@ def is_modX(label)
 end
 
 def length(sequence, **kwargs)
-  return 0 if ['', [], {}].include?(sequence).!
+  return 0 if ['', nil, 0, false, [], {}].include?(sequence)
   if sequence.instance_of?(String) || sequence.instance_of?(Array)
     if sequence.instance_of?(String)
       parsed_sequence = parse(sequence, **kwargs)
@@ -73,10 +73,12 @@ end
 
 def parse(sequence, show_unmodified_termini=false, split=false, allow_unknown_modifications=false, **kwargs)
   sequence = sequence.to_s
+  return if sequence.empty?
   _modX_sequence = /^([^-]+-)?((?:[^A-Z-]*[A-Z])+)(-[^-]+)?$/
 
   begin
-    n, body, c = _modX_sequence.match(sequence)
+    m = _modX_sequence.match(sequence)
+    n, body, c = m[1], m[2], m[3]
   rescue => exception
     raise PyteomicsError.new('Not a valid modX sequence: ' + sequence)
   end
@@ -93,7 +95,7 @@ def parse(sequence, show_unmodified_termini=false, split=false, allow_unknown_mo
 
   _modX_split = /([^A-Z-]*)([A-Z])/
   _modX_group = /[^A-Z-]*[A-Z]/
-  if ['', nil, 0, [], {}].include?(split).!
+  if ['', nil, 0, false, [], {}].include?(split).!
     parsed_sequence = body.scan(_modX_split).map{ _1[0] ? _1 : [_1[1],] }
   else
     parsed_sequence = body.scan(_modX_group)
@@ -119,15 +121,15 @@ def parse(sequence, show_unmodified_termini=false, split=false, allow_unknown_mo
     end
   end
 
-  if ['', nil, 0, [], {}].include?(show_unmodified_termini).! || nterm != STD_nterm
-    if ['', nil, 0, [], {}].include?(split).!
+  if ['', nil, 0, false, [], {}].include?(show_unmodified_termini).! || nterm != STD_nterm
+    if ['', nil, 0, false, [], {}].include?(split).!
       parsed_sequence[0] = [nterm, ] + parsed_sequence[0]
     else
       parsed_sequence.insert(0, nterm)
     end
   end
-  if ['', nil, 0, [], {}].include?(show_unmodified_termini).! || cterm != STD_cterm
-    if ['', nil, 0, [], {}].include?(split).!
+  if ['', nil, 0, false, [], {}].include?(show_unmodified_termini).! || cterm != STD_cterm
+    if ['', nil, 0, false, [], {}].include?(split).!
       parsed_sequence[-1] = parsed_sequence[-1] + [cterm,]
     else
       parsed_sequence << cterm

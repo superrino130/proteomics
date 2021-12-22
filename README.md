@@ -25,3 +25,23 @@ print('Done, {0} sequences obtained!'.format(len(unique_peptides)))
 Done, 188701 sequences obtained!
 ```
 と表示されます。
+
+その後
+```python
+peptides = [{'sequence': i} for i in unique_peptides]
+
+print('Parsing peptide sequences...')
+for peptide in peptides:
+    peptide['parsed_sequence'] = parser.parse(
+        peptide['sequence'],
+        show_unmodified_termini=True)
+    peptide['length'] = parser.length(peptide['parsed_sequence'])
+print('Done!')
+
+peptides = [peptide for peptide in peptides if peptide['length'] <= 100]
+```
+を経て、
+```ruby
+peptides.size = 188548
+```
+まで動作します。
