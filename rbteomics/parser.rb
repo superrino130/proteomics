@@ -2,6 +2,8 @@
 # from collections import deque
 # import itertools as it
 # from .auxiliary import PyteomicsError, memoize, BasicComposition, cvstr, cvquery
+require_relative 'auxiliary/utils'
+
 
 STD_amino_acids = ['Q', 'W', 'E', 'R', 'T', 'Y', 'I', 'P', 'A', 'S',
   'D', 'F', 'G', 'H', 'K', 'L', 'C', 'V', 'N', 'M']
@@ -13,7 +15,7 @@ STD_nterm = 'H-'
 STD_cterm = '-OH'
 """modX label for the unmodified C-terminus."""
 
-STD_labels = std_amino_acids + [std_nterm, std_cterm]
+STD_labels = STD_amino_acids + [STD_nterm, STD_cterm]
 """modX labels for the standard amino acids and unmodified termini."""
 
 
@@ -36,7 +38,7 @@ def length(sequence, **kwargs)
   return 0 if ['', [], {}].include?(sequence).!
   if sequence.instance_of?(String) || sequence.instance_of?(Array)
     if sequence.instance_of?(String)
-      parsed_sequence = parse(...)
+      parsed_sequence = parse(sequence, **kwargs)
     else
       parsed_sequence = sequence
     end
@@ -109,7 +111,7 @@ def parse(sequence, show_unmodified_termini=false, split=false, allow_unknown_mo
       if ['', nil, 0, [], {}].include?(split).!
         mod, x = group.size == 2 ? group : ['', group[0]]
       else
-        mod, X = _modX_split.match(group)
+        mod, x = _modX_split.match(group)
       end
       if (mod.! && labels.include?(x).!) || ((labels.include?(mod + x) || labels.include?(x)).! && (labels.include?(mod) || allow_unknown_modifications))
         raise PyteomicsError.new("Unknown label: #{group}")
@@ -136,7 +138,7 @@ end
 
 def valid(*args, **kwargs)
   begin
-    parse(...)
+    parse(*args, **kwargs)
   rescue => exception
     return false
   end
@@ -196,12 +198,12 @@ def amino_acid_composition(sequence, show_unmodified_termini=false, term_aa=fals
     parsed_sequence = parse(sequence, show_unmodified_termini, allow_unknown_modifications=allow_unknown_modifications, labels=labels)
   elsif sequence.instance_of?(Array)
     if ['', nil, 0, [], {}].include?(sequence).! && sequence[0].instance_of?(Array)
-      parsed_sequence = parse(sequence.to_s || true), show_unmodified_termini, allow_unknown_modifications=allow_unknown_modifications, labels=labels)
+      parsed_sequence = parse(sequence.to_s || true, show_unmodified_termini, allow_unknown_modifications=allow_unknown_modifications, labels=labels)
     else
       parsed_sequence = sequence
     end
   else
-    raise PyteomicsError.new("Unsupported type of a sequence. Must be str or list, not #{sequence.class}"))
+    raise PyteomicsError.new("Unsupported type of a sequence. Must be str or list, not #{sequence.class}")
   end
 
   aa_dict = BasicComposition.new()
@@ -223,3 +225,145 @@ def amino_acid_composition(sequence, show_unmodified_termini=false, term_aa=fals
 
   aa_dict
 end
+
+class Deque
+  attr_accessor :que
+  def initialize(*args)
+    @que = args[0]
+    @maxlen = args[1]
+  end
+
+  def push(args)
+    @que.push args
+    while @maxlen.nil?.! && @que.size > @maxlen
+      @que.shift
+    end
+  end
+
+  def unshift(args)
+    @que.unshift args
+    while @maxlen.nil?.! && @que.size > @maxlen
+      @que.pop
+    end
+  end
+end
+
+#memoize()
+def cleave(sequence, rule, missed_cleavages=0, min_length=nil, semi=false, exception=nil)
+  Set.new(_cleave(sequence, rule, missed_cleavages, min_length, semi, exception))
+end
+
+def _cleave(sequence, rule, missed_cleavages=0, min_length=nil, semi=false, exception=nil)
+  if @expasy_rules.include?(rule)
+    rule = @expasy_rules[rule]
+  elsif psims_rules.include?(rule)
+    rule = psims_rules[rule]
+  elsif _psims_index.include?(rule)
+    rule = _psims_index[rule]
+  end
+  exception = @expasy_rules[exception] || exception
+  peptides = []
+  ml = missed_cleavages + 2
+  trange = (0...ml)
+  cleavage_sites = Deque.new([0], maxlen=ml)
+  if min_length.nil?
+    min_length = 1
+  end
+  cl = 1
+  if exception.nil?.!
+    exceptions = Set.new
+    i = 0
+    while m = sequence.match(exception, i)
+      i = m.end(0)
+      exceptions << i
+    end
+    exceptions << nil
+  end
+  a = []
+  i = 0
+  while m = sequence.match(rule, i)
+    i = m.end(0)
+    a << i
+  end
+  a << nil
+  a.each do |i|
+    next if !!exception && exceptions.include?(i)
+    cleavage_sites.push(i)
+    cl += 1 if cl < ml
+    trange.to_a[0...cl - 1].each do |j|
+      seq = sequence[cleavage_sites.que[j]...cleavage_sites.que[-1]]
+      if ['', nil, false, 0, [], {}].include?(seq).! && seq.size >= min_length
+        peptides << seq
+        if ['', nil, false, 0, [], {}].include?(semi).!
+          (min_length...seq.size - 1).map{ peptides << seq[0..._1] }
+          (1...seq.size - min_length + 1).map{ peptides << seq[_1..-1] }
+        end
+      end
+    end
+  end
+  peptides
+end
+
+def num_sites(sequence, rule, **kwargs)
+  _cleave(sequence, rule, **kwargs).size - 1
+end
+
+@expasy_rules = {
+  'arg-c' =>         /R/,
+  'asp-n' =>         /\w(?=D)/,
+  'bnps-skatole'  => /W/,
+  'caspase 1' =>     /(?<=[FWYL]\w[HAT])D(?=[^PEDQKR])/,
+  'caspase 2' =>     /(?<=DVA)D(?=[^PEDQKR])/,
+  'caspase 3' =>     /(?<=DMQ)D(?=[^PEDQKR])/,
+  'caspase 4' =>     /(?<=LEV)D(?=[^PEDQKR])/,
+  'caspase 5' =>     /(?<=[LW]EH)D/,
+  'caspase 6' =>     /(?<=VE[HI])D(?=[^PEDQKR])/,
+  'caspase 7' =>     /(?<=DEV)D(?=[^PEDQKR])/,
+  'caspase 8' =>     /(?<=[IL]ET)D(?=[^PEDQKR])/,
+  'caspase 9' =>     /(?<=LEH)D/,
+  'caspase 10' =>    /(?<=IEA)D/,
+  'chymotrypsin high specificity'  => /([FY](?=[^P]))|(W(?=[^MP]))/,
+  'chymotrypsin low specificity' =>
+      /([FLY](?=[^P]))|(W(?=[^MP]))|(M(?=[^PY]))|(H(?=[^DMPW]))/,
+  'clostripain' =>   /R/,
+  'cnbr' =>          /M/,
+  'enterokinase' =>  /(?<=[DE]{3})K/,
+  'factor xa' =>     /(?<=[AFGILTVM][DE]G)R/,
+  'formic acid' =>   /D/,
+  'glutamyl endopeptidase' => /E/,
+  'granzyme b' =>    /(?<=IEP)D/,
+  'hydroxylamine' => /N(?=G)/,
+  'iodosobenzoic acid' => /W/,
+  'lysc' =>          /K/,
+  'ntcb' =>          /\w(?=C)/,
+  'pepsin ph1.3' =>  /((?<=[^HKR][^P])[^R](?=[FL][^P]))|((?<=[^HKR][^P])[FL](?=\w[^P]))/,
+  'pepsin ph2.0' =>  /((?<=[^HKR][^P])[^R](?=[FLWY][^P]))|((?<=[^HKR][^P])[FLWY](?=\w[^P]))/,
+  'proline endopeptidase' => /(?<=[HKR])P(?=[^P])/,
+  'proteinase k' =>  /[AEFILTVWY]/,
+  'staphylococcal peptidase i' => /(?<=[^E])E/,
+  'thermolysin' =>   /[^DE](?=[AFILMV])/,
+  'thrombin' =>      /((?<=G)R(?=G))|((?<=[AFGILTVM][AFGILTVWA]P)R(?=[^DE][^DE]))/,
+  'trypsin' =>       /([KR](?=[^P]))|((?<=W)K(?=P))|((?<=M)R(?=P))/,
+  'trypsin_exception' => /((?<=[CD])K(?=D))|((?<=C)K(?=[HY]))|((?<=C)R(?=K))|((?<=R)R(?=[HR]))/,
+}
+
+psims_rules = {
+  Cvstr.new('2-iodobenzoate', 'MS:1001918') => /(?<=W)/,
+  Cvstr.new('Arg-C', 'MS:1001303') => /(?<=R)(?!P)/,
+  Cvstr.new('Asp-N', 'MS:1001304') => /(?=[BD])/,
+  Cvstr.new('Asp-N ambic', 'MS:1001305') => /(?=[DE])/,
+  Cvstr.new('CNBr', 'MS:1001307') => /(?<=M)/,
+  Cvstr.new('Chymotrypsin', 'MS:1001306') => /(?<=[FYWL])(?!P)/,
+  Cvstr.new('Formic acid', 'MS:1001308') => /((?<=D))|((?=D))/,
+  Cvstr.new('Lys-C', 'MS:1001309') => /(?<=K)(?!P)/,
+  Cvstr.new('Lys-C/P', 'MS:1001310') => /(?<=K)/,
+  Cvstr.new('PepsinA', 'MS:1001311') => /(?<=[FL])/,
+  Cvstr.new('TrypChymo', 'MS:1001312') => /(?<=[FYWLKR])(?!P)/,
+  Cvstr.new('Trypsin', 'MS:1001251') => /(?<=[KR])(?!P)/,
+  Cvstr.new('Trypsin/P', 'MS:1001313') => /(?<=[KR])/,
+  Cvstr.new('V8-DE', 'MS:1001314') => /(?<=[BDEZ])(?!P)/,
+  Cvstr.new('V8-E', 'MS:1001315') => /(?<=[EZ])(?!P)/,
+  Cvstr.new('glutamyl endopeptidase', 'MS:1001917') => /(?<=[^E]E)/,
+  Cvstr.new('leukocyte elastase', 'MS:1001915') => /(?<=[ALIV])(?!P)/,
+  Cvstr.new('proline endopeptidase', 'MS:1001916') => /(?<=[HKR]P)(?!P)/,
+}
