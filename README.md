@@ -5,8 +5,9 @@
 次のgemが必要です。
 ```ruby
 gem "bio"
-gem "mechanize"
 ```
+`fasta` 形式は `biruby` を利用しています。
+その他のファイル形式についての実装を計画中です。
 # 進捗状況
 
 [EXAMPLE 1: UNRAVELLING THE PEPTIDOME](https://pyteomics.readthedocs.io/en/latest/examples/example_fasta.html) の
