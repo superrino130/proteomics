@@ -1,7 +1,10 @@
 # from __future__ import division
 # import math
 # from .. import parser
+require_relative '../parser'
 # from ..auxiliary import PyteomicsError, _nist_mass, BasicComposition
+require_relative '../auxiliary/constants'
+require_relative '../auxiliary/structures'
 # from itertools import chain, product, combinations_with_replacement
 # from collections import defaultdict
 # try:
@@ -17,7 +20,13 @@ require 'set'
 require 'time'
 # from ..xml import xpath
 
-@nist_mass = _nist_mass
+# @nist_mass = $_nist_mass
+# @std_aa_comp = {}
+# @std_ion_comp = {}
+
+# @_isotope_string = /^([A-Z][a-z+]*)(?:\[(\d+)\])?$/
+# @_atom = /([A-Z][a-z+]*)(?:\[(\d+)\])?([+-]?\d+)?/
+# @_formula = /^(#{@_atom})*$/
 
 def _make_isotope_string(element_name, isotope_num)
   if isotope_num == 0
@@ -28,24 +37,18 @@ def _make_isotope_string(element_name, isotope_num)
 end
 
 def _parse_isotope_string(label)
-  element_name, num = @_isotope_string.match(label)
+  @_isotope_string = /^([A-Z][a-z+]*)(?:\[(\d+)\])?$/
+  m = @_isotope_string.match(label)
+  element_name, num = m[0], m[1]
   isotope_num = num ? num.to_i : 0
   [element_name, isotope_num]
 end
 
-@std_aa_comp = {}
-
-@std_ion_comp = {}
-
-@_isotope_string = /'^([A-Z][a-z+]*)(?:\[(\d+)\])?$'/
-@_atom = /'([A-Z][a-z+]*)(?:\[(\d+)\])?([+-]?\d+)?'/
-@_formula = /'^(#{@_atom})*$'/
-
 class Composition < BasicComposition
-  @_kw_sources = Set.new(['formula', 'sequence', 'parsed_sequence', 'split_sequence', 'composition'])
+  # @_kw_sources = Set.new(['formula', 'sequence', 'parsed_sequence', 'split_sequence', 'composition'])
 
   def _from_parsed_sequence(parsed_sequence, aa_comp)
-    clear()
+    @defaultdict.clear
     comp = Hash.new(0)
     parsed_sequence.each do |aa|
       if aa_comp.include?(aa)
@@ -54,16 +57,16 @@ class Composition < BasicComposition
         end
       else
         begin
-          mod, aa = parser._split_label(aa)
+          mod, aa = _split_label(aa)
           chain(aa_comp[mod], aa_comp[aa]).each do | elem, cnt|
             comp[elem] += cnt
           end
         rescue => exception
-          raise PyteomicsError("No information for #{aa} in `aa_comp`")
+          raise PyteomicsError.new("No information for #{aa} in `aa_comp`")
         end
       end
     end
-    _form_composition(comp)
+    _from_composition(comp)
   end
 
   def _from_split_sequence(split_sequence, aa_comp)
@@ -85,55 +88,127 @@ class Composition < BasicComposition
             break
           end
         end
-        raise PyteomicsError("Invalid group starting from position #{i + 1}: #{group}") if j == 0
+        raise PyteomicsError.new("Invalid group starting from position #{i + 1}: #{group}") if j == 0
       end
     end
     _from_composition(comp)
   end
 
   def _from_sequence(sequence, aa_comp)
-    parsed_sequence = parser.parse(
+    parsed_sequence = parse(
         sequence,
         labels=aa_comp,
-        show_unmodified_termini=True)
+        show_unmodified_termini=true)
     _from_parsed_sequence(parsed_sequence, aa_comp)
   end
 
   def _from_formula(formula, mass_data)
+    @_atom = /([A-Z][a-z+]*)(?:\[(\d+)\])?([+-]?\d+)?/
+    @_formula = /^(([A-Z][a-z+]*)(?:\[(\d+)\])?([+-]?\d+)?)*$/
     if @_formula.match(formula).!
-      raise PyteomicsError('Invalid formula: ' + formula)
+      raise PyteomicsError.new('Invalid formula: ' + formula)
     end
-    @_atom.match(formula).each do |elem, isotope, number|
+    formula.scan(@_atom).each do |elem, isotope, number|
+      p [112,elem,isotope,number,formula]
       if mass_data.include?(elem).!
-        raise PyteomicsError('Unknown chemical element: ' + elem)
+        raise PyteomicsError.new('Unknown chemical element: ' + elem)
       end
       # self[_make_isotope_string(elem, int(isotope) if isotope else 0)] += int(number) if number else 1
-      self[_make_isotope_string(elem, isotope.nil? 0 : isotope_num.to_i)] += number.nil? ? 1 : number.to_i
+      @defaultdict[_make_isotope_string(elem, isotope.nil? ? 0 : isotope_num.to_i)] += number.nil? ? 1 : number.to_i
     end
   end
 
   def _from_composition(comp)
     comp.each do |isotope_string, num_atoms|
       element_name, isotope_num = _parse_isotope_string(isotope_string)
-      self[_make_isotope_string(element_name, isotope_num)] = num_atoms
+      @defaultdict[_make_isotope_string(element_name, isotope_num)] = num_atoms
     end
   end
+  
+  @@std_aa_comp_base = {
+    'A' => Composition.new(**{'H' => 5, 'C' => 3, 'O' => 1, 'N' => 1}),
+    'C' => Composition.new(**{'H' => 5, 'C' => 3, 'S' => 1, 'O' => 1, 'N' => 1}),
+    'D' => Composition.new(**{'H' => 5, 'C' => 4, 'O' => 3, 'N' => 1}),
+    'E' => Composition.new(**{'H' => 7, 'C' => 5, 'O' => 3, 'N' => 1}),
+    'F' => Composition.new(**{'H' => 9, 'C' => 9, 'O' => 1, 'N' => 1}),
+    'G' => Composition.new(**{'H' => 3, 'C' => 2, 'O' => 1, 'N' => 1}),
+    'H' => Composition.new(**{'H' => 7, 'C' => 6, 'N' => 3, 'O' => 1}),
+    'I' => Composition.new(**{'H' => 11, 'C' => 6, 'O' => 1, 'N' => 1}),
+    'J' => Composition.new(**{'H' => 11, 'C' => 6, 'O' => 1, 'N' => 1}),
+    'K' => Composition.new(**{'H' => 12, 'C' => 6, 'N' => 2, 'O' => 1}),
+    'L' => Composition.new(**{'H' => 11, 'C' => 6, 'O' => 1, 'N' => 1}),
+    'M' => Composition.new(**{'H' => 9, 'C' => 5, 'S' => 1, 'O' => 1, 'N' => 1}),
+    'N' => Composition.new(**{'H' => 6, 'C' => 4, 'O' => 2, 'N' => 2}),
+    'P' => Composition.new(**{'H' => 7, 'C' => 5, 'O' => 1, 'N' => 1}),
+    'Q' => Composition.new(**{'H' => 8, 'C' => 5, 'O' => 2, 'N' => 2}),
+    'R' => Composition.new(**{'H' => 12, 'C' => 6, 'N' => 4, 'O' => 1}),
+    'S' => Composition.new(**{'H' => 5, 'C' => 3, 'O' => 2, 'N' => 1}),
+    'T' => Composition.new(**{'H' => 7, 'C' => 4, 'O' => 2, 'N' => 1}),
+    'V' => Composition.new(**{'H' => 9, 'C' => 5, 'O' => 1, 'N' => 1}),
+    'W' => Composition.new(**{'C' => 11, 'H' => 10, 'N' => 2, 'O' => 1}),
+    'Y' => Composition.new(**{'H' => 9, 'C' => 9, 'O' => 2, 'N' => 1}),
+    'U' => Composition.new(**{'H' => 5, 'C' => 3, 'O' => 1, 'N' => 1, 'Se' => 1}),
+    'O' => Composition.new(**{'H' => 19, 'C' => 12, 'O' => 2, 'N' => 3}),
+    'H-' => Composition.new(**{'H' => 1}),
+    '-OH' => Composition.new(**{'O' => 1, 'H' => 1}),
+  }
+  @@std_ion_comp_base = {
+    'M' => Composition.new(**{'formula' => ''}),
+    'M-H2O' => Composition.new(**{'formula' => 'H-2O-1'}),
+    'M-NH3' => Composition.new(**{'formula' => 'N-1H-3'}),
+    'a' => Composition.new(**{'formula' => 'H-2O-1' + 'C-1O-1'}),
+    'a-H2O' => Composition.new(**{'formula' => 'H-2O-1' + 'C-1O-1' + 'H-2O-1'}),
+    'a-NH3' => Composition.new(**{'formula' => 'H-2O-1' + 'C-1O-1' + 'N-1H-3'}),
+    'b' => Composition.new(**{'formula' => 'H-2O-1'}),
+    'b-H2O' => Composition.new(**{'formula' => 'H-2O-1' + 'H-2O-1'}),
+    'b-NH3' => Composition.new(**{'formula' => 'H-2O-1' + 'N-1H-3'}),
+    'c' => Composition.new(**{'formula' => 'H-2O-1' + 'NH3'}),
+    'c-1' => Composition.new(**{'formula' => 'H-2O-1' + 'NH3' + 'H-1'}),
+    'c-dot' => Composition.new(**{'formula' => 'H-2O-1' + 'NH3' + 'H1'}),
+    'c+1' => Composition.new(**{'formula' => 'H-2O-1' + 'NH3' + 'H1'}),
+    'c+2' => Composition.new(**{'formula' => 'H-2O-1' + 'NH3' + 'H2'}),
+    'c-H2O' => Composition.new(**{'formula' => 'H-2O-1' + 'NH3' + 'H-2O-1'}),
+    'c-NH3' => Composition.new(**{'formula' => 'H-2O-1'}),
+    'x' => Composition.new(**{'formula' => 'H-2O-1' + 'CO2'}),
+    'x-H2O' => Composition.new(**{'formula' => 'H-2O-1' + 'CO2' + 'H-2O-1'}),
+    'x-NH3' => Composition.new(**{'formula' => 'H-2O-1' + 'CO2' + 'N-1H-3'}),
+    'y' => Composition.new(**{'formula' => ''}),
+    'y-H2O' => Composition.new(**{'formula' => 'H-2O-1'}),
+    'y-NH3' => Composition.new(**{'formula' => 'N-1H-3'}),
+    'z' => Composition.new(**{'formula' => 'H-2O-1' + 'ON-1H-1'}),
+    'z-dot' => Composition.new(**{'formula' => 'H-2O-1' + 'ON-1'}),
+    'z+1' => Composition.new(**{'formula' => 'H-2O-1' + 'ON-1H1'}),
+    'z+2' => Composition.new(**{'formula' => 'H-2O-1' + 'ON-1H2'}),
+    'z+3' => Composition.new(**{'formula' => 'H-2O-1' + 'ON-1H3'}),
+    'z-H2O' => Composition.new(**{'formula' => 'H-2O-1' + 'ON-1H-1' + 'H-2O-1'}),
+    'z-NH3' => Composition.new(**{'formula' => 'H-2O-1' + 'ON-1H-1' + 'N-1H-3'}),
+  }
 
-  def initialize(*args, **kwargs)
-    __init__(args, kwargs)
+  def initialize(...)
+    @_kw_sources = Set.new(['formula', 'sequence', 'parsed_sequence', 'split_sequence', 'composition'])
+    @nist_mass = $_nist_mass.dup
+
+    @std_aa_comp ||= @@std_aa_comp_base.dup
+    @std_ion_comp ||= @@std_ion_comp_base
+
+    @std_aa_comp.merge(@@std_aa_comp_base)
+    @std_ion_comp.merge(@@std_ion_comp_base)
+
+    __init__(...)
   end
 
   def __init__(*args, **kwargs)
-    # defaultdict.__init__(self, int)
+    @defaultdict = Hash.new(0)
     aa_comp = kwargs['aa_comp'] || @std_aa_comp
     mass_data = kwargs['mass_data'] || @nist_mass
-    kw_given = @_kw_sources.intersection(kwargs)
+    kw_given = @_kw_sources & kwargs.keys
     if kw_given.size > 1
-      raise PyteomicsError("Only one of #{@_kw_sources.join(', ')} can be specified!\nGiven: #{kw_given.join(', ')}")
-    elsif kw_given
-      kwa = kw_given.pop
-      getattr('_from_' + kwa)(kwargs[kwa], kwa == 'formula' ? mass_data : aa_comp)
-    elsif args
+      raise PyteomicsError.new("Only one of #{@_kw_sources.join(', ')} can be specified!\nGiven: #{kw_given.join(', ')}")
+    elsif ['', 0, nil, false].include?(kw_given).! && kw_given.empty?.!
+      kwa = kw_given.first
+      kw_given.delete(kwa)
+      method(('_from_' + kwa).to_sym).call(kwargs[kwa], kwa == 'formula' ? mass_data : aa_comp)
+    elsif ['', 0, nil, false].include?(args[0]).! && args[0].empty?.!
       if args[0].instance_of?(Hash)
           _from_composition(args[0])
       elsif args[0].instance_of?(String)
@@ -143,38 +218,38 @@ class Composition < BasicComposition
           begin
             _from_formula(args[0], mass_data)
           rescue => exception
-            raise PyteomicsError("Could not create a Composition object from string: '#{args[0]}': not a valid sequence or formula")
+            raise PyteomicsError.new("Could not create a Composition object from string: '#{args[0]}': not a valid sequence or formula")
           end
         end
       else
         begin
-          _from_sequence(parser.tostring(args[0], True), aa_comp)
+          _from_sequence(tostring(args[0], true), aa_comp)
         rescue => exception
-          raise PyteomicsError("Could not create a Composition object from '#{args[0]}'. A Composition object must be specified by sequence, parsed or split sequence, formula or dict.")
+          raise PyteomicsError.new("Could not create a Composition object from '#{args[0]}'. A Composition object must be specified by sequence, parsed or split sequence, formula or dict.")
         end
       end
     else
       _from_composition(kwargs)
     end
 
-    ion_comp = kwargs['ion_comp'] || std_ion_comp
-    if  kwargs['ion_type']
-        self += ion_comp[kwargs['ion_type']]
+    ion_comp = kwargs['ion_comp'] || @std_ion_comp
+    if [0, nil, false].include?(kwargs['ion_type']).! && kwargs['ion_type'].empty?.!
+      @defaultdict.merge(ion_comp[kwargs['ion_type']])
     end
 
     charge = self['H+']
-    if kwargs['charge']
-      if charge
-        raise PyteomicsError("Charge is specified both by the number of protons and 'charge' in kwargs")
+    if ['', 0, nil, false].include?(kwargs['charge']).! && kwargs['charge'].empty?.!
+      if [0, nil, false].include?(charge).! && charge.empty?.!
+        raise PyteomicsError.new("Charge is specified both by the number of protons and 'charge' in kwargs")
       end
       charge = kwargs['charge']
-      self['H+'] = charge
+      @defaultdict['H+'] = charge
     end
   end
 
   def mass(**kwargs)
-    composition = self
-    mass_data = kwargs['mass_data'] || nist_mass
+    composition = @defaultdict.dup
+    mass_data = kwargs['mass_data'] || @nist_mass
 
     mass = 0.0
     average = kwargs['average'] || false
@@ -198,68 +273,8 @@ class Composition < BasicComposition
   end
 end
 
-@std_aa_comp.merge({
-  'A' => Composition.new({'H' => 5, 'C' => 3, 'O' => 1, 'N' => 1}),
-  'C' => Composition.new({'H' => 5, 'C' => 3, 'S' => 1, 'O' => 1, 'N' => 1}),
-  'D' => Composition.new({'H' => 5, 'C' => 4, 'O' => 3, 'N' => 1}),
-  'E' => Composition.new({'H' => 7, 'C' => 5, 'O' => 3, 'N' => 1}),
-  'F' => Composition.new({'H' => 9, 'C' => 9, 'O' => 1, 'N' => 1}),
-  'G' => Composition.new({'H' => 3, 'C' => 2, 'O' => 1, 'N' => 1}),
-  'H' => Composition.new({'H' => 7, 'C' => 6, 'N' => 3, 'O' => 1}),
-  'I' => Composition.new({'H' => 11, 'C' => 6, 'O' => 1, 'N' => 1}),
-  'J' => Composition.new({'H' => 11, 'C' => 6, 'O' => 1, 'N' => 1}),
-  'K' => Composition.new({'H' => 12, 'C' => 6, 'N' => 2, 'O' => 1}),
-  'L' => Composition.new({'H' => 11, 'C' => 6, 'O' => 1, 'N' => 1}),
-  'M' => Composition.new({'H' => 9, 'C' => 5, 'S' => 1, 'O' => 1, 'N' => 1}),
-  'N' => Composition.new({'H' => 6, 'C' => 4, 'O' => 2, 'N' => 2}),
-  'P' => Composition.new({'H' => 7, 'C' => 5, 'O' => 1, 'N' => 1}),
-  'Q' => Composition.new({'H' => 8, 'C' => 5, 'O' => 2, 'N' => 2}),
-  'R' => Composition.new({'H' => 12, 'C' => 6, 'N' => 4, 'O' => 1}),
-  'S' => Composition.new({'H' => 5, 'C' => 3, 'O' => 2, 'N' => 1}),
-  'T' => Composition.new({'H' => 7, 'C' => 4, 'O' => 2, 'N' => 1}),
-  'V' => Composition.new({'H' => 9, 'C' => 5, 'O' => 1, 'N' => 1}),
-  'W' => Composition.new({'C' => 11, 'H' => 10, 'N' => 2, 'O' => 1}),
-  'Y' => Composition.new({'H' => 9, 'C' => 9, 'O' => 2, 'N' => 1}),
-  'U' => Composition.new({'H' => 5, 'C' => 3, 'O' => 1, 'N' => 1, 'Se' => 1}),
-  'O' => Composition.new({'H' => 19, 'C' => 12, 'O' => 2, 'N' => 3}),
-  'H-' => Composition.new({'H' => 1}),
-  '-OH' => Composition.new({'O' => 1, 'H' => 1}),
-  })
-
-@std_ion_comp.merge({
-  'M' => Composition.new(formula=''),
-  'M-H2O' => Composition.new(formula='H-2O-1'),
-  'M-NH3' => Composition.new(formula='N-1H-3'),
-  'a' => Composition.new(formula='H-2O-1' + 'C-1O-1'),
-  'a-H2O' => Composition.new(formula='H-2O-1' + 'C-1O-1' + 'H-2O-1'),
-  'a-NH3' => Composition.new(formula='H-2O-1' + 'C-1O-1' + 'N-1H-3'),
-  'b' => Composition.new(formula='H-2O-1'),
-  'b-H2O' => Composition.new(formula='H-2O-1' + 'H-2O-1'),
-  'b-NH3' => Composition.new(formula='H-2O-1' + 'N-1H-3'),
-  'c' => Composition.new(formula='H-2O-1' + 'NH3'),
-  'c-1' => Composition.new(formula='H-2O-1' + 'NH3' + 'H-1'),
-  'c-dot' => Composition.new(formula='H-2O-1' + 'NH3' + 'H1'),
-  'c+1' => Composition.new(formula='H-2O-1' + 'NH3' + 'H1'),
-  'c+2' => Composition.new(formula='H-2O-1' + 'NH3' + 'H2'),
-  'c-H2O' => Composition.new(formula='H-2O-1' + 'NH3' + 'H-2O-1'),
-  'c-NH3' => Composition.new(formula='H-2O-1'),
-  'x' => Composition.new(formula='H-2O-1' + 'CO2'),
-  'x-H2O' => Composition.new(formula='H-2O-1' + 'CO2' + 'H-2O-1'),
-  'x-NH3' => Composition.new(formula='H-2O-1' + 'CO2' + 'N-1H-3'),
-  'y' => Composition.new(formula=''),
-  'y-H2O' => Composition.new(formula='H-2O-1'),
-  'y-NH3' => Composition.new(formula='N-1H-3'),
-  'z' => Composition.new(formula='H-2O-1' + 'ON-1H-1'),
-  'z-dot' => Composition.new(formula='H-2O-1' + 'ON-1'),
-  'z+1' => Composition.new(formula='H-2O-1' + 'ON-1H1'),
-  'z+2' => Composition.new(formula='H-2O-1' + 'ON-1H2'),
-  'z+3' => Composition.new(formula='H-2O-1' + 'ON-1H3'),
-  'z-H2O' => Composition.new(formula='H-2O-1' + 'ON-1H-1' + 'H-2O-1'),
-  'z-NH3' => Composition.new(formula='H-2O-1' + 'ON-1H-1' + 'N-1H-3'),
-  })
-
 def calculate_mass(*args, **kwargs)
-  composition = kwargs['composition'] ? Composition.new(kwargs['composition'] : Composition.new(*args, **kwargs)
+  composition = kwargs['composition'] ? Composition.new(kwargs['composition']) : Composition.new(*args, **kwargs)
   composition.mass(**kwargs)
 end
 
@@ -271,7 +286,7 @@ def most_probable_isotopic_composition(*args, **kwargs)
     composition[element_name] += composition.pop(isotope_string) if isotope_num
   end
 
-  mass_data = kwargs['mass_data'] || nist_mass
+  mass_data = kwargs['mass_data'] || @nist_mass
   elements_with_isotopes = kwargs['elements_with_isotopes']
   isotopic_composition = Composition.new
 
@@ -301,12 +316,12 @@ def isotopic_composition_abundance(*args, **kwargs)
     element_name, isotope_num = _parse_isotope_string(element)
 
     if isotopic_composition.include?('element_name') && (isotope_num == 0 || isotopic_composition[element_name].include?(0))
-      raise PyteomicsError("Please specify the isotopic states of all atoms of #{element_name} or do not specify them at all.")
+      raise PyteomicsError.new("Please specify the isotopic states of all atoms of #{element_name} or do not specify them at all.")
     else
       isotopic_composition[element_name][isotope_num] = composition[element]
     end
   end
-  mass_data = kwargs['mass_data'] || nist_mass
+  mass_data = kwargs['mass_data'] || @nist_mass
   num1, num2, denom = 1, 1, 1
   isotopic_composition.each do |element_name, isotope_dict|
     num1 *= isotope_dict.values.sum.to_r
@@ -322,7 +337,7 @@ end
 def isotopologues(*args, **kwargs)
   iso_threshold = kwargs.delete['isotope_threshold'] || 5e-4
   overall_threshold = kwargs.delete['overall_threshold'] || 0.0
-  mass_data = kwargs['mass_data'] || nist_mass
+  mass_data = kwargs['mass_data'] || @nist_mass
   elements_with_isotopes = kwargs['elements_with_isotopes']
   report_abundance = kwargs['report_abundance'] || false
   composition = kwargs['composition'] ? Composition.new(kwargs['composition']) : Composition.new(*args, **kwargs)
@@ -402,22 +417,22 @@ end
   'O' => 237.14773,
 }
 
-def fast_mass(sequence:, ion_type:, charge:, **kwargs:)
+def fast_mass(sequence, ion_type, charge, **kwargs)
   aa_mass = kwargs['aa_mass'] || @std_aa_mass
   begin
     mass = sequence.map{ aa_mass[_1] }.sum
   rescue => exception
-    raise PyteomicsError('No mass data for residue: ' + e.args[0].to_s)
+    raise PyteomicsError.new('No mass data for residue: ' + e.args[0].to_s)
   end
 
-  mass_data = kwargs['mass_data'] || nist_mass
+  mass_data = kwargs['mass_data'] || @nist_mass
   mass += mass_data['H'][0][0] * 2 + mass_data['O'][0][0]
 
   if ion_type
     begin
-      icomp = (kwargs['ion_comp'] || std_ion_comp)[ion_type]
+      icomp = (kwargs['ion_comp'] || @std_ion_comp)[ion_type]
     rescue => exception
-      raise PyteomicsError("Unknown ion type: #{ion_type}")
+      raise PyteomicsError.new("Unknown ion type: #{ion_type}")
     end
 
     mass += icomp.map{ |element, num| mass_data[element][0][0] * num }.sum
@@ -426,15 +441,15 @@ def fast_mass(sequence:, ion_type:, charge:, **kwargs:)
   mass
 end
 
-def fast_mass2(sequence:, ion_type:, charge:, **kwargs:)
+def fast_mass2(sequence, ion_type, charge, **kwargs)
   aa_mass = kwargs['aa_mass'] || @std_aa_mass
   mass_data = kwargs['mass_data'] || @nist_mass
   aa_mass['H-'] = mass_data['H'][0][0] if aa_mass.include?('H-').!
   aa_mass['-OH'] = mass_data['H'][0][0] + mass_data['O'][0][0] if aa_mass.include?('-OH').!
   begin
-    comp = parser.amino_acid_composition(sequence:, show_unmodified_termini: true, allow_unknown_modifications: true, labels: aa_mass)
+    comp = amino_acid_composition(sequence, show_unmodified_termini=true, allow_unknown_modifications=true, labels=aa_mass)
   rescue => exception
-    raise PyteomicsError("Mass not specified for label(s): #{(Set.new(parser.parse(sequence)) - aa_mass).join(', ')}")
+    raise PyteomicsError.new("Mass not specified for label(s): #{(Set.new(parse(sequence)) - aa_mass).join(', ')}")
   end
 
   begin
@@ -443,19 +458,19 @@ def fast_mass2(sequence:, ion_type:, charge:, **kwargs:)
       if aa_mass.include?(aa)
         mass += aa_mass[aa] * num
       else
-        mod, x = parser._split_label(aa)
+        mod, x = _split_label(aa)
         mass += (aa_mass[mod] + aa_mass[x]) * num
       end
     end
   rescue => exception
-    raise PyteomicsError("Unspecified mass for modification: '#{e.args[0]}'")
+    raise PyteomicsError.new("Unspecified mass for modification: '#{e.args[0]}'")
   end
 
   if ion_type
     begin
-      icomp = (kwargs['ion_comp'] || std_ion_comp)[ion_type]
+      icomp = (kwargs['ion_comp'] || @std_ion_comp)[ion_type]
     rescue => exception
-      raise PyteomicsError("Unknown ion type: #{ion_type}")      
+      raise PyteomicsError.new("Unknown ion type: #{ion_type}")      
     end
 
     mass += icomp.map{ |element, num| mass_data[element][0][0] * num }.sum
@@ -466,7 +481,7 @@ def fast_mass2(sequence:, ion_type:, charge:, **kwargs:)
 end
 
 class Unimod
-  def initialize(source: 'http://www.unimod.org/xml/unimod.xml')
+  def initialize(source='http://www.unimod.org/xml/unimod.xml')
     __init__(source)
   end
 
@@ -492,7 +507,7 @@ class Unimod
           else
             isotope = isotope.to_i
           end
-          comp += Composition.new(formula: _make_isotope_string(symbol, isotope), mass_data: self._massdata) * amount
+          comp += Composition.new(**{'formula' => _make_isotope_string(symbol, isotope), 'mass_data' => self._massdata}) * amount
         end
       end
       new_d['composition'] = comp
@@ -551,7 +566,7 @@ class Unimod
     end
   end
 
-  def _xpath(, path:, element:)
+  def _xpath(path, element=nil)
     return xpath(self._tree, path, 'umod') if element.nil?
     xpath(element, path, 'umod')
   end
@@ -573,7 +588,6 @@ class Unimod
     massdata.each do |elem, isotopes|
       isotopes[isotopes[0][0].round.to_i] = isotopes[0]
       if isotopes.size == 3
-        # m1, m2 = (x[1][0] for x in sorted(isotopes.items())[1:])
         m1, m2 = isotopes.sort[1..-1].map{ _1[1][0] }
         m_avg = avg[elem]
         a = (m2 - m_avg) / (m2 - m1)
@@ -596,7 +610,7 @@ class Unimod
     self._massdata
   end
 
-  def by_title(title:, strict: true)
+  def by_title(title, strict=true)
     f = {true: operator.eq, false: operator.contains}
     func = f[strict]
     result = self._mods.select{ func(_1['title'], title) }
@@ -604,7 +618,7 @@ class Unimod
     result
   end
 
-  def by_name(name:, strict: true)
+  def by_name(name, strict=true)
     f = {true: operator.eq, talse: operator.contains}
     func = f[strict]
     result = self._mods.select{ func(_1['full_name'], name) }
@@ -617,5 +631,5 @@ class Unimod
     self._mods[self._id[i]]
   end
 
-  __getitem__ = by_id
+  # __getitem__ = by_id
 end

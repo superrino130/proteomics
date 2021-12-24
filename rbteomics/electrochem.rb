@@ -7,7 +7,7 @@ require_relative 'auxiliary/structures'
 def charge(sequence, pH, **kwargs)
   peptide_dict, pK = _prepare_charge_dict(sequence, **kwargs)
 
-  pH_list = pH.instance_of?(Array) ? pH : [pH,]
+  pH_list = pH.instance_of?(Array) ? pH : [pH]
 
   charge_list = _charge_for_dict(peptide_dict, pH_list, pK)
   pH.instance_of?(Array).! ? charge_list[0] : charge_list
@@ -16,8 +16,8 @@ end
 def _prepare_charge_dict(sequence, **kwargs)
   nterm = cterm = n_aa = c_aa = nil
   pK = (kwargs['pK'] || @pK_lehninger).dup
-  pK_nterm = kwargs['pK_nterm'] || Set.new
-  pK_cterm = kwargs['pK_cterm'] || Set.new
+  pK_nterm = kwargs['pK_nterm'] || {}
+  pK_cterm = kwargs['pK_cterm'] || {}
 
   if sequence.instance_of?(Hash)
     peptide_dict = sequence.dup
@@ -57,13 +57,13 @@ def _prepare_charge_dict(sequence, **kwargs)
     end
   elsif [String, Array].include?(sequence.class)
     if sequence.instance_of?(String)
-      if sequence =~ /\A[A-Z]+\z/
+      if sequence.match?(/\A\p{Lu}+\z/)
         parsed_sequence = [STD_nterm] + sequence.to_a + [STD_cterm]
       else
         parsed_sequence = parse(sequence, show_unmodified_termini=true)
       end
     elsif sequence.instance_of?(Array)
-      if sequence[0][-1] != '-' or sequence[-1][0] != '-'
+      if sequence[0][-1] != '-' || sequence[-1][0] != '-'
         raise PyteomicsError.new('Parsed sequences must contain terminal groups at 0-th and last positions.')
       end
       parsed_sequence = sequence
@@ -94,13 +94,13 @@ def _charge_for_dict(peptide_dict, pH_list, pK)
   charge_list = []
   pH_list.each do |pH_value|
     charge = 0
-    peptide_dict.each do |aa|
+    peptide_dict.each_key do |aa|
       (pK[aa] || []).each do |ionizable_group|
         charge += peptide_dict[aa] * ionizable_group[1] * (
           1. / (1. + 10 ** (ionizable_group[1] * (pH_value - ionizable_group[0]))))
       end
     end
-    charge_list.append(charge)
+    charge_list << charge
   end
 
   charge_list

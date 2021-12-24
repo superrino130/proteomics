@@ -28,8 +28,8 @@ def _intern_unit_or_cv(unit_or_cv:)
 end
 
 class PyteomicsError < Exception
-  def initialize(msg, *values)
-    __init__(msg, values)
+  def initialize(...)
+    __init__(...)
   end
 
   def __init__(msg, *values)
@@ -37,8 +37,8 @@ class PyteomicsError < Exception
     @values = values
   end
 
-  def __str__()
-    if @values.!
+  def to_s
+    if [0, nil, false].include?(@values) || @values.empty?
       return "Pyteomics error, message: #{@message.inspect}"
     else
       return "Pyteomics error, message: #{@message.inspect}, #{@values.inspect})"
@@ -139,26 +139,28 @@ def _parse_ion(ion_text)
   end
 end
 
-# class BasicComposition(defaultdict, Counter):
-class BasicComposition
-  def initialize(*args, **kwargs)
+class BasicComposition < Hash
+  def initialize(...)
     @defaultdict = Hash.new(0)
-    __init__(args, kwargs)
+    __init__(...)
   end
 
   def __init__(*args, **kwargs)
     @defaultdict.map{ |k, v|
-      @defaultdict.delete(k) if [0, '', nil, []].include?(v)
+      @defaultdict.delete(k) if [0, nil, false].include?(v) || v.empty?
     }
   end
 
-  def __str__()
+  def to_s
     # return '{}({})'.format(type(self).__name__, dict.__repr__(self))
     "#{self.class}(#{@defaultdict.inspect})"
   end
 
+  def __str__()
+    to_s
+  end
   def __repr__()
-    __str__()
+    to_s
   end
 
   def __repr_pretty__(p, cycle)
@@ -507,4 +509,4 @@ class CVQueryEngine
   end
 end
 
-cvquery = CVQueryEngine.new()
+@cvquery = CVQueryEngine.new

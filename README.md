@@ -44,4 +44,15 @@ peptides = [peptide for peptide in peptides if peptide['length'] <= 100]
 ```ruby
 peptides.size = 188548
 ```
+更に、
+```
+print('Calculating the mass, charge and m/z...')
+for peptide in peptides:
+    peptide['charge'] = int(round(
+        electrochem.charge(peptide['parsed_sequence'], pH=2.0)))
+    peptide['mass'] = mass.calculate_mass(peptide['parsed_sequence'])
+    peptide['m/z'] = mass.calculate_mass(peptide['parsed_sequence'],
+        charge=peptide['charge'])
+print('Done!')
+```
 まで動作します。

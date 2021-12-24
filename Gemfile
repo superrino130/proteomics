@@ -10,3 +10,5 @@ gem "pandas"
 #dev
 gem "bio"
 gem "minitest-reporters"
+gem "ruby-debug-ide"        # debug for vscode
+gem "debase"                # debug for vscode

@@ -3,6 +3,7 @@
 # import itertools as it
 # from .auxiliary import PyteomicsError, memoize, BasicComposition, cvstr, cvquery
 require_relative 'auxiliary/utils'
+require_relative 'auxiliary/structures'
 
 
 STD_amino_acids = ['Q', 'W', 'E', 'R', 'T', 'Y', 'I', 'P', 'A', 'S',
@@ -92,16 +93,15 @@ def parse(sequence, show_unmodified_termini=false, split=false, allow_unknown_mo
       n = nil
     end
   end
-
+  
   _modX_split = /([^A-Z-]*)([A-Z])/
   _modX_group = /[^A-Z-]*[A-Z]/
   if ['', nil, 0, false, [], {}].include?(split).!
-    parsed_sequence = body.scan(_modX_split).map{ _1[0] ? _1 : [_1[1],] }
+    parsed_sequence = body.scan(_modX_split).map{ _1[0] ? _1 : [_1[1]] }
   else
     parsed_sequence = body.scan(_modX_group)
   end
-  nterm, cterm = (['', nil, [], {}, 0].include?(n).! ? n : STD_nterm), (['', nil, [], {}, 0].include?(c).! ? c : STD_cterm)
-
+  nterm, cterm = (['', nil, 0, false, [], {}].include?(n).! ? n : STD_nterm), (['', nil, 0, false, [], {}].include?(c).! ? c : STD_cterm)
   if !!labels
     labels = Set.new(labels)
     [n, c].zip([STD_nterm, STD_cterm]).each do |term, std_term|
@@ -135,7 +135,7 @@ def parse(sequence, show_unmodified_termini=false, split=false, allow_unknown_mo
       parsed_sequence << cterm
     end
   end
-  parsed_sequence
+  parsed_sequence.flatten.compact.reject(&:empty?)
 end
 
 def valid(*args, **kwargs)
@@ -258,10 +258,10 @@ end
 def _cleave(sequence, rule, missed_cleavages=0, min_length=nil, semi=false, exception=nil)
   if @expasy_rules.include?(rule)
     rule = @expasy_rules[rule]
-  elsif psims_rules.include?(rule)
-    rule = psims_rules[rule]
-  elsif _psims_index.include?(rule)
-    rule = _psims_index[rule]
+  elsif @psims_rules.include?(rule)
+    rule = @psims_rules[rule]
+  elsif @_psims_index.include?(rule)
+    rule = @_psims_index[rule]
   end
   exception = @expasy_rules[exception] || exception
   peptides = []
@@ -349,7 +349,7 @@ end
   'trypsin_exception' => /((?<=[CD])K(?=D))|((?<=C)K(?=[HY]))|((?<=C)R(?=K))|((?<=R)R(?=[HR]))/,
 }
 
-psims_rules = {
+@psims_rules = {
   Cvstr.new('2-iodobenzoate', 'MS:1001918') => /(?<=W)/,
   Cvstr.new('Arg-C', 'MS:1001303') => /(?<=R)(?!P)/,
   Cvstr.new('Asp-N', 'MS:1001304') => /(?=[BD])/,
@@ -369,3 +369,185 @@ psims_rules = {
   Cvstr.new('leukocyte elastase', 'MS:1001915') => /(?<=[ALIV])(?!P)/,
   Cvstr.new('proline endopeptidase', 'MS:1001916') => /(?<=[HKR]P)(?!P)/,
 }
+
+@_psims_index = @cvquery.__call__(@psims_rules)
+
+def isoforms(sequence, **kwargs)
+  def main(group)
+    if group[-1][0] == '-'
+      i = -2
+    else
+      i = -1
+    end
+    [group.size + i, group[i]]
+  end
+
+  def apply_mod(label, mod)
+    group = label.to_a
+    m = main(group)[0]
+    c = true
+    if m == 0 && is_term_mod(mod)
+      group.insert(0, mod)
+    elsif mod[0] == '-' && (group[-1] == STD_cterm || (group[-1][0] == '-' && override))
+      group[-1] = mod
+    elsif mod[-1] == '-' && (group[0] == STD_nterm || (group[0][-1] == '-' && override))
+      group[0] = mod
+    elsif is_term_mod(mod).!
+      if ['', nil, false, 0, [], {}].include?(m).! && group[m - 1][-1] != '-'
+        if ['', nil, false, 0, [], {}].include?(override).!
+          group[m - 1] = mode
+        else
+          c = false
+        end
+      else
+        group.insert(m, mod)
+      end
+    else
+      c = false
+    end
+    if c
+      group
+    end
+  end
+
+  variable_mods = kwargs['variable_mods'] || {}
+  varmods_term, varmods_non_term = [], []
+  variable_mods.sort.each do |m, r|
+    if is_term_mod(m)
+      varmods_term << [m, r]
+    else
+      varmods_non_term << [m, r]
+    end
+  end
+  fixed_mods = kwargs['fixed_mods'] || {}
+  parse_kw = {}
+  if kwargs.include?('labels')
+    parse_kw['labels'] = kwargs['labels'].to_a + fixed_mods.to_a
+  end
+  parsed = parse(sequence, true, true, **parse_kw)
+  override = kwargs['override'] || false
+  show_unmodified_termini = kwargs['show_unmodified_termini'] || false
+  max_mods = kwargs['max_mods']
+  format_ = kwargs['format'] || 'str'
+
+  fixed_mods.each do |cmod, res|
+    parsed.each_with_index do |group, i|
+      if !!res || res.include?(main(group)[1])
+        parsed[i] = apply_mod(group, cmod) || parsed[i]
+      end
+    end
+  end
+
+  states = [[parsed[0]]]
+  m0 = main(parsed[0])[1]
+  varmods_non_term.each do |m, r|
+    if !!r || r.include?(m0) || r.include?('nterm' + m0) || parsed.size == 1 && r.include?('cterm' + m0)
+      applid = apply_mod(parsed[0], m)
+      if !!apply_mod
+        states[0] << applid
+      end
+    end
+  end
+  more_states = []
+  varmods_term.each do |m, r|
+    if !!r || r.include?(m0)
+      if m[-1] == '-' || parsed.size == 1
+        states[0].each do |group|
+          applid = apply_mod(group, m)
+          if !!applid
+            more_states << applid
+          end
+        end
+      end
+    end
+  end
+  states[0].concat(more_states)
+
+  parsed[1...-1].each do |group|
+    gstates = [group]
+    varmods_non_term.each do |m, r|
+      if !!r || r.include?(group[-1])
+        applid = apply_mod(group, m)
+        if !!applid
+          gstates << applid
+        end
+      end
+    end
+    states << gstates
+  end
+
+  if parsed.size > 1
+    states << [parsed[-1]]
+    m1 = main(parsed[-1])[1]
+    varmods_non_term.each do |m, r|
+      if !!r || r.include?(m1) || r.include?('cterm' + m1) || parsed.size == 1 && r.include?('nterm' + m1)
+        applid = apply_mod(parsed[-1], m)
+        if !!applid
+          states[-1] << applid
+        end
+      end
+    end
+    more_states = []
+    varmods_term.each do |m, r|
+      if !!r || r.include?(m1)
+        if m[0] == '-' || parsed.size == 1
+          states[-1].each do |group|
+            applid = apply_mod(group, m)
+            if !!applid
+              more_states << applid
+            end
+          end
+        end
+      end
+    end
+    states[-1].concat(more_states)
+  end
+
+  sites = states.select.with_index{ _1[1].size > 1 }
+  if max_mods.nil? || max_mods > sites.size
+    possible_states = states.inject(:product).map(&:flatten)
+  else
+    def state_lists
+      Fiber.new do
+        (0..max_mods).to_a.each do |m|
+          sites.combination(m).each do |comb|
+            skel = states.map{ [_1[0]] }
+            comb.each do |i, e|
+              skel[i] = e[1..-1]
+            end
+            yield skel
+          end
+        end
+      end
+    end
+    possible_states = state_lists.resume.map{ _1.inject(:product).map(&:flatten) }.inject(&:concat).flatten
+  end
+
+  if format_ == 'split'
+    def strip_std_terms
+      Fiber.new do
+        possible_states.each do |ps|
+          ps = ps.to_a
+          if show_unmodified_termini.!
+            if ps[0][0] == STD_nterm
+              ps[0] = ps[0][1..-1]
+            end
+            if ps[-1][-1] == STD_cterm
+              ps[-1] = ps[-1][-1]
+            end
+          end
+          yield ps
+        end
+      end
+    end
+    strip_std_terms.resume
+  elsif format_ == 'str'
+    possible_states.map{ tostring(_1, show_unmodified_termini) }
+  else
+    raise PyteomicsError("Unsupported value of 'format': #{format_}")
+  end
+end
+
+def coverage(protein, peptides)
+
+end
