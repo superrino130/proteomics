@@ -141,14 +141,22 @@ end
 
 class BasicComposition < Hash
   def initialize(...)
-    @defaultdict = Hash.new(0)
     __init__(...)
   end
 
   def __init__(*args, **kwargs)
-    @defaultdict.map{ |k, v|
-      @defaultdict.delete(k) if [0, nil, false].include?(v) || v.empty?
-    }
+    @defaultdict = Hash.new(0)
+    # @defaultdict.each do |k, v|
+    #   if ['', 0, nil, false, [], {}].include?(v)
+    #     @defaultdict.delete(k)
+    #   end
+    # end
+    if args
+      @defaultdict.merge(args.tally)
+    end
+    if kwargs
+      @defaultdict.merge(kwargs)
+    end
   end
 
   def to_s
@@ -264,6 +272,14 @@ class BasicComposition < Hash
     class_, args, state, list_iterator, dict_iterator = super.__reduce__()
     args = []
     return [class_, args, state, list_iterator, dict_iterator]
+  end
+
+  def [](key, value)
+    @defaultdict[key] = value
+  end
+  
+  def defaultdict
+    @defaultdict
   end
 end
 

@@ -40,10 +40,69 @@ def _parse_isotope_string(label)
   @_isotope_string = /^([A-Z][a-z+]*)(?:\[(\d+)\])?$/
   m = @_isotope_string.match(label)
   element_name, num = m[0], m[1]
-  isotope_num = num ? num.to_i : 0
+  isotope_num = ['', 0, nil, false, [], {}].include?(num).! ? num.to_i : 0
   [element_name, isotope_num]
 end
 
+@@std_aa_comp={
+    'A' => {'H' => 5, 'C' => 3, 'O' => 1, 'N' => 1},
+    'C' => {'H' => 5, 'C' => 3, 'S' => 1, 'O' => 1, 'N' => 1},
+    'D' => {'H' => 5, 'C' => 4, 'O' => 3, 'N' => 1},
+    'E' => {'H' => 7, 'C' => 5, 'O' => 3, 'N' => 1},
+    'F' => {'H' => 9, 'C' => 9, 'O' => 1, 'N' => 1},
+    'G' => {'H' => 3, 'C' => 2, 'O' => 1, 'N' => 1},
+    'H' => {'H' => 7, 'C' => 6, 'N' => 3, 'O' => 1},
+    'I' => {'H' => 11, 'C' => 6, 'O' => 1, 'N' => 1},
+    'J' => {'H' => 11, 'C' => 6, 'O' => 1, 'N' => 1},
+    'K' => {'H' => 12, 'C' => 6, 'N' => 2, 'O' => 1},
+    'L' => {'H' => 11, 'C' => 6, 'O' => 1, 'N' => 1},
+    'M' => {'H' => 9, 'C' => 5, 'S' => 1, 'O' => 1, 'N' => 1},
+    'N' => {'H' => 6, 'C' => 4, 'O' => 2, 'N' => 2},
+    'P' => {'H' => 7, 'C' => 5, 'O' => 1, 'N' => 1},
+    'Q' => {'H' => 8, 'C' => 5, 'O' => 2, 'N' => 2},
+    'R' => {'H' => 12, 'C' => 6, 'N' => 4, 'O' => 1},
+    'S' => {'H' => 5, 'C' => 3, 'O' => 2, 'N' => 1},
+    'T' => {'H' => 7, 'C' => 4, 'O' => 2, 'N' => 1},
+    'V' => {'H' => 9, 'C' => 5, 'O' => 1, 'N' => 1},
+    'W' => {'C' => 11, 'H' => 10, 'N' => 2, 'O' => 1},
+    'Y' => {'H' => 9, 'C' => 9, 'O' => 2, 'N' => 1},
+    'U' => {'H' => 5, 'C' => 3, 'O' => 1, 'N' => 1, 'Se' => 1},
+    'O' => {'H' => 19, 'C' => 12, 'O' => 2, 'N' => 3},
+    'H-' => {'H' => 1},
+    '-OH' => {'O' => 1, 'H' => 1},
+  }
+  @@std_ion_comp={
+    'M' => {'formula' => ''},
+    'M-H2O' => {'formula' => 'H-2O-1'},
+    'M-NH3' => {'formula' => 'N-1H-3'},
+    'a' => {'formula' => 'H-2O-1' + 'C-1O-1'},
+    'a-H2O' => {'formula' => 'H-2O-1' + 'C-1O-1' + 'H-2O-1'},
+    'a-NH3' => {'formula' => 'H-2O-1' + 'C-1O-1' + 'N-1H-3'},
+    'b' => {'formula' => 'H-2O-1'},
+    'b-H2O' => {'formula' => 'H-2O-1' + 'H-2O-1'},
+    'b-NH3' => {'formula' => 'H-2O-1' + 'N-1H-3'},
+    'c' => {'formula' => 'H-2O-1' + 'NH3'},
+    'c-1' => {'formula' => 'H-2O-1' + 'NH3' + 'H-1'},
+    'c-dot' => {'formula' => 'H-2O-1' + 'NH3' + 'H1'},
+    'c+1' => {'formula' => 'H-2O-1' + 'NH3' + 'H1'},
+    'c+2' => {'formula' => 'H-2O-1' + 'NH3' + 'H2'},
+    'c-H2O' => {'formula' => 'H-2O-1' + 'NH3' + 'H-2O-1'},
+    'c-NH3' => {'formula' => 'H-2O-1'},
+    'x' => {'formula' => 'H-2O-1' + 'CO2'},
+    'x-H2O' => {'formula' => 'H-2O-1' + 'CO2' + 'H-2O-1'},
+    'x-NH3' => {'formula' => 'H-2O-1' + 'CO2' + 'N-1H-3'},
+    'y' => {'formula' => ''},
+    'y-H2O' => {'formula' => 'H-2O-1'},
+    'y-NH3' => {'formula' => 'N-1H-3'},
+    'z' => {'formula' => 'H-2O-1' + 'ON-1H-1'},
+    'z-dot' => {'formula' => 'H-2O-1' + 'ON-1'},
+    'z+1' => {'formula' => 'H-2O-1' + 'ON-1H1'},
+    'z+2' => {'formula' => 'H-2O-1' + 'ON-1H2'},
+    'z+3' => {'formula' => 'H-2O-1' + 'ON-1H3'},
+    'z-H2O' => {'formula' => 'H-2O-1' + 'ON-1H-1' + 'H-2O-1'},
+    'z-NH3' => {'formula' => 'H-2O-1' + 'ON-1H-1' + 'N-1H-3'},
+  }
+  
 class Composition < BasicComposition
   # @_kw_sources = Set.new(['formula', 'sequence', 'parsed_sequence', 'split_sequence', 'composition'])
 
@@ -109,7 +168,6 @@ class Composition < BasicComposition
       raise PyteomicsError.new('Invalid formula: ' + formula)
     end
     formula.scan(@_atom).each do |elem, isotope, number|
-      p [112,elem,isotope,number,formula]
       if mass_data.include?(elem).!
         raise PyteomicsError.new('Unknown chemical element: ' + elem)
       end
@@ -125,81 +183,16 @@ class Composition < BasicComposition
     end
   end
   
-  @@std_aa_comp_base = {
-    'A' => Composition.new(**{'H' => 5, 'C' => 3, 'O' => 1, 'N' => 1}),
-    'C' => Composition.new(**{'H' => 5, 'C' => 3, 'S' => 1, 'O' => 1, 'N' => 1}),
-    'D' => Composition.new(**{'H' => 5, 'C' => 4, 'O' => 3, 'N' => 1}),
-    'E' => Composition.new(**{'H' => 7, 'C' => 5, 'O' => 3, 'N' => 1}),
-    'F' => Composition.new(**{'H' => 9, 'C' => 9, 'O' => 1, 'N' => 1}),
-    'G' => Composition.new(**{'H' => 3, 'C' => 2, 'O' => 1, 'N' => 1}),
-    'H' => Composition.new(**{'H' => 7, 'C' => 6, 'N' => 3, 'O' => 1}),
-    'I' => Composition.new(**{'H' => 11, 'C' => 6, 'O' => 1, 'N' => 1}),
-    'J' => Composition.new(**{'H' => 11, 'C' => 6, 'O' => 1, 'N' => 1}),
-    'K' => Composition.new(**{'H' => 12, 'C' => 6, 'N' => 2, 'O' => 1}),
-    'L' => Composition.new(**{'H' => 11, 'C' => 6, 'O' => 1, 'N' => 1}),
-    'M' => Composition.new(**{'H' => 9, 'C' => 5, 'S' => 1, 'O' => 1, 'N' => 1}),
-    'N' => Composition.new(**{'H' => 6, 'C' => 4, 'O' => 2, 'N' => 2}),
-    'P' => Composition.new(**{'H' => 7, 'C' => 5, 'O' => 1, 'N' => 1}),
-    'Q' => Composition.new(**{'H' => 8, 'C' => 5, 'O' => 2, 'N' => 2}),
-    'R' => Composition.new(**{'H' => 12, 'C' => 6, 'N' => 4, 'O' => 1}),
-    'S' => Composition.new(**{'H' => 5, 'C' => 3, 'O' => 2, 'N' => 1}),
-    'T' => Composition.new(**{'H' => 7, 'C' => 4, 'O' => 2, 'N' => 1}),
-    'V' => Composition.new(**{'H' => 9, 'C' => 5, 'O' => 1, 'N' => 1}),
-    'W' => Composition.new(**{'C' => 11, 'H' => 10, 'N' => 2, 'O' => 1}),
-    'Y' => Composition.new(**{'H' => 9, 'C' => 9, 'O' => 2, 'N' => 1}),
-    'U' => Composition.new(**{'H' => 5, 'C' => 3, 'O' => 1, 'N' => 1, 'Se' => 1}),
-    'O' => Composition.new(**{'H' => 19, 'C' => 12, 'O' => 2, 'N' => 3}),
-    'H-' => Composition.new(**{'H' => 1}),
-    '-OH' => Composition.new(**{'O' => 1, 'H' => 1}),
-  }
-  @@std_ion_comp_base = {
-    'M' => Composition.new(**{'formula' => ''}),
-    'M-H2O' => Composition.new(**{'formula' => 'H-2O-1'}),
-    'M-NH3' => Composition.new(**{'formula' => 'N-1H-3'}),
-    'a' => Composition.new(**{'formula' => 'H-2O-1' + 'C-1O-1'}),
-    'a-H2O' => Composition.new(**{'formula' => 'H-2O-1' + 'C-1O-1' + 'H-2O-1'}),
-    'a-NH3' => Composition.new(**{'formula' => 'H-2O-1' + 'C-1O-1' + 'N-1H-3'}),
-    'b' => Composition.new(**{'formula' => 'H-2O-1'}),
-    'b-H2O' => Composition.new(**{'formula' => 'H-2O-1' + 'H-2O-1'}),
-    'b-NH3' => Composition.new(**{'formula' => 'H-2O-1' + 'N-1H-3'}),
-    'c' => Composition.new(**{'formula' => 'H-2O-1' + 'NH3'}),
-    'c-1' => Composition.new(**{'formula' => 'H-2O-1' + 'NH3' + 'H-1'}),
-    'c-dot' => Composition.new(**{'formula' => 'H-2O-1' + 'NH3' + 'H1'}),
-    'c+1' => Composition.new(**{'formula' => 'H-2O-1' + 'NH3' + 'H1'}),
-    'c+2' => Composition.new(**{'formula' => 'H-2O-1' + 'NH3' + 'H2'}),
-    'c-H2O' => Composition.new(**{'formula' => 'H-2O-1' + 'NH3' + 'H-2O-1'}),
-    'c-NH3' => Composition.new(**{'formula' => 'H-2O-1'}),
-    'x' => Composition.new(**{'formula' => 'H-2O-1' + 'CO2'}),
-    'x-H2O' => Composition.new(**{'formula' => 'H-2O-1' + 'CO2' + 'H-2O-1'}),
-    'x-NH3' => Composition.new(**{'formula' => 'H-2O-1' + 'CO2' + 'N-1H-3'}),
-    'y' => Composition.new(**{'formula' => ''}),
-    'y-H2O' => Composition.new(**{'formula' => 'H-2O-1'}),
-    'y-NH3' => Composition.new(**{'formula' => 'N-1H-3'}),
-    'z' => Composition.new(**{'formula' => 'H-2O-1' + 'ON-1H-1'}),
-    'z-dot' => Composition.new(**{'formula' => 'H-2O-1' + 'ON-1'}),
-    'z+1' => Composition.new(**{'formula' => 'H-2O-1' + 'ON-1H1'}),
-    'z+2' => Composition.new(**{'formula' => 'H-2O-1' + 'ON-1H2'}),
-    'z+3' => Composition.new(**{'formula' => 'H-2O-1' + 'ON-1H3'}),
-    'z-H2O' => Composition.new(**{'formula' => 'H-2O-1' + 'ON-1H-1' + 'H-2O-1'}),
-    'z-NH3' => Composition.new(**{'formula' => 'H-2O-1' + 'ON-1H-1' + 'N-1H-3'}),
-  }
-
   def initialize(...)
     @_kw_sources = Set.new(['formula', 'sequence', 'parsed_sequence', 'split_sequence', 'composition'])
     @nist_mass = $_nist_mass.dup
-
-    @std_aa_comp ||= @@std_aa_comp_base.dup
-    @std_ion_comp ||= @@std_ion_comp_base
-
-    @std_aa_comp.merge(@@std_aa_comp_base)
-    @std_ion_comp.merge(@@std_ion_comp_base)
 
     __init__(...)
   end
 
   def __init__(*args, **kwargs)
     @defaultdict = Hash.new(0)
-    aa_comp = kwargs['aa_comp'] || @std_aa_comp
+    aa_comp = kwargs['aa_comp'] || @@std_aa_comp
     mass_data = kwargs['mass_data'] || @nist_mass
     kw_given = @_kw_sources & kwargs.keys
     if kw_given.size > 1
@@ -232,12 +225,12 @@ class Composition < BasicComposition
       _from_composition(kwargs)
     end
 
-    ion_comp = kwargs['ion_comp'] || @std_ion_comp
+    ion_comp = kwargs['ion_comp'] || @@std_ion_comp
     if [0, nil, false].include?(kwargs['ion_type']).! && kwargs['ion_type'].empty?.!
       @defaultdict.merge(ion_comp[kwargs['ion_type']])
     end
 
-    charge = self['H+']
+    charge = @defaultdict['H+']
     if ['', 0, nil, false].include?(kwargs['charge']).! && kwargs['charge'].empty?.!
       if [0, nil, false].include?(charge).! && charge.empty?.!
         raise PyteomicsError.new("Charge is specified both by the number of protons and 'charge' in kwargs")
@@ -255,8 +248,9 @@ class Composition < BasicComposition
     average = kwargs['average'] || false
     composition.each do |isotope_string, amount|
       element_name, isotope_num = _parse_isotope_string(isotope_string)
-      if isotope_num.! && average
-        mass_data[element_name].each do |isotope, data|
+      if ['', 0, nil, false, [], {}].include?(isotope_num) && average
+        # if isotope_num.! && average
+          mass_data[element_name].each do |isotope, data|
           mass += (amount * data[0] * data[1]) if isotope
         end
       else
@@ -265,7 +259,7 @@ class Composition < BasicComposition
     end
 
     charge = kwargs['charge'] || composition['H+']
-    if charge
+    if ['', 0, nil, false, [], {}].include?(charge).!
       mass += mass_data['H+'][0][0] * charge if not composition['H+']
       mass /= charge
     end
@@ -273,8 +267,128 @@ class Composition < BasicComposition
   end
 end
 
+# @@std_aa_comp={
+#   'A' => Composition.new(**{'H' => 5, 'C' => 3, 'O' => 1, 'N' => 1}),
+#   'C' => Composition.new(**{'H' => 5, 'C' => 3, 'S' => 1, 'O' => 1, 'N' => 1}),
+#   'D' => Composition.new(**{'H' => 5, 'C' => 4, 'O' => 3, 'N' => 1}),
+#   'E' => Composition.new(**{'H' => 7, 'C' => 5, 'O' => 3, 'N' => 1}),
+#   'F' => Composition.new(**{'H' => 9, 'C' => 9, 'O' => 1, 'N' => 1}),
+#   'G' => Composition.new(**{'H' => 3, 'C' => 2, 'O' => 1, 'N' => 1}),
+#   'H' => Composition.new(**{'H' => 7, 'C' => 6, 'N' => 3, 'O' => 1}),
+#   'I' => Composition.new(**{'H' => 11, 'C' => 6, 'O' => 1, 'N' => 1}),
+#   'J' => Composition.new(**{'H' => 11, 'C' => 6, 'O' => 1, 'N' => 1}),
+#   'K' => Composition.new(**{'H' => 12, 'C' => 6, 'N' => 2, 'O' => 1}),
+#   'L' => Composition.new(**{'H' => 11, 'C' => 6, 'O' => 1, 'N' => 1}),
+#   'M' => Composition.new(**{'H' => 9, 'C' => 5, 'S' => 1, 'O' => 1, 'N' => 1}),
+#   'N' => Composition.new(**{'H' => 6, 'C' => 4, 'O' => 2, 'N' => 2}),
+#   'P' => Composition.new(**{'H' => 7, 'C' => 5, 'O' => 1, 'N' => 1}),
+#   'Q' => Composition.new(**{'H' => 8, 'C' => 5, 'O' => 2, 'N' => 2}),
+#   'R' => Composition.new(**{'H' => 12, 'C' => 6, 'N' => 4, 'O' => 1}),
+#   'S' => Composition.new(**{'H' => 5, 'C' => 3, 'O' => 2, 'N' => 1}),
+#   'T' => Composition.new(**{'H' => 7, 'C' => 4, 'O' => 2, 'N' => 1}),
+#   'V' => Composition.new(**{'H' => 9, 'C' => 5, 'O' => 1, 'N' => 1}),
+#   'W' => Composition.new(**{'C' => 11, 'H' => 10, 'N' => 2, 'O' => 1}),
+#   'Y' => Composition.new(**{'H' => 9, 'C' => 9, 'O' => 2, 'N' => 1}),
+#   'U' => Composition.new(**{'H' => 5, 'C' => 3, 'O' => 1, 'N' => 1, 'Se' => 1}),
+#   'O' => Composition.new(**{'H' => 19, 'C' => 12, 'O' => 2, 'N' => 3}),
+#   'H-' => Composition.new(**{'H' => 1}),
+#   '-OH' => Composition.new(**{'O' => 1, 'H' => 1}),
+# }
+# @@std_ion_comp={
+#   'M' => Composition.new(**{'formula' => ''}),
+#   'M-H2O' => Composition.new(**{'formula' => 'H-2O-1'}),
+#   'M-NH3' => Composition.new(**{'formula' => 'N-1H-3'}),
+#   'a' => Composition.new(**{'formula' => 'H-2O-1' + 'C-1O-1'}),
+#   'a-H2O' => Composition.new(**{'formula' => 'H-2O-1' + 'C-1O-1' + 'H-2O-1'}),
+#   'a-NH3' => Composition.new(**{'formula' => 'H-2O-1' + 'C-1O-1' + 'N-1H-3'}),
+#   'b' => Composition.new(**{'formula' => 'H-2O-1'}),
+#   'b-H2O' => Composition.new(**{'formula' => 'H-2O-1' + 'H-2O-1'}),
+#   'b-NH3' => Composition.new(**{'formula' => 'H-2O-1' + 'N-1H-3'}),
+#   'c' => Composition.new(**{'formula' => 'H-2O-1' + 'NH3'}),
+#   'c-1' => Composition.new(**{'formula' => 'H-2O-1' + 'NH3' + 'H-1'}),
+#   'c-dot' => Composition.new(**{'formula' => 'H-2O-1' + 'NH3' + 'H1'}),
+#   'c+1' => Composition.new(**{'formula' => 'H-2O-1' + 'NH3' + 'H1'}),
+#   'c+2' => Composition.new(**{'formula' => 'H-2O-1' + 'NH3' + 'H2'}),
+#   'c-H2O' => Composition.new(**{'formula' => 'H-2O-1' + 'NH3' + 'H-2O-1'}),
+#   'c-NH3' => Composition.new(**{'formula' => 'H-2O-1'}),
+#   'x' => Composition.new(**{'formula' => 'H-2O-1' + 'CO2'}),
+#   'x-H2O' => Composition.new(**{'formula' => 'H-2O-1' + 'CO2' + 'H-2O-1'}),
+#   'x-NH3' => Composition.new(**{'formula' => 'H-2O-1' + 'CO2' + 'N-1H-3'}),
+#   'y' => Composition.new(**{'formula' => ''}),
+#   'y-H2O' => Composition.new(**{'formula' => 'H-2O-1'}),
+#   'y-NH3' => Composition.new(**{'formula' => 'N-1H-3'}),
+#   'z' => Composition.new(**{'formula' => 'H-2O-1' + 'ON-1H-1'}),
+#   'z-dot' => Composition.new(**{'formula' => 'H-2O-1' + 'ON-1'}),
+#   'z+1' => Composition.new(**{'formula' => 'H-2O-1' + 'ON-1H1'}),
+#   'z+2' => Composition.new(**{'formula' => 'H-2O-1' + 'ON-1H2'}),
+#   'z+3' => Composition.new(**{'formula' => 'H-2O-1' + 'ON-1H3'}),
+#   'z-H2O' => Composition.new(**{'formula' => 'H-2O-1' + 'ON-1H-1' + 'H-2O-1'}),
+#   'z-NH3' => Composition.new(**{'formula' => 'H-2O-1' + 'ON-1H-1' + 'N-1H-3'}),
+# }
+
+
+# @@std_aa_comp = {}
+# @@std_ion_comp = {}
+# @@std_aa_comp.merge!({
+#   'A' => Composition.new(**{'H' => 5, 'C' => 3, 'O' => 1, 'N' => 1}),
+#   'C' => Composition.new(**{'H' => 5, 'C' => 3, 'S' => 1, 'O' => 1, 'N' => 1}),
+#   'D' => Composition.new(**{'H' => 5, 'C' => 4, 'O' => 3, 'N' => 1}),
+#   'E' => Composition.new(**{'H' => 7, 'C' => 5, 'O' => 3, 'N' => 1}),
+#   'F' => Composition.new(**{'H' => 9, 'C' => 9, 'O' => 1, 'N' => 1}),
+#   'G' => Composition.new(**{'H' => 3, 'C' => 2, 'O' => 1, 'N' => 1}),
+#   'H' => Composition.new(**{'H' => 7, 'C' => 6, 'N' => 3, 'O' => 1}),
+#   'I' => Composition.new(**{'H' => 11, 'C' => 6, 'O' => 1, 'N' => 1}),
+#   'J' => Composition.new(**{'H' => 11, 'C' => 6, 'O' => 1, 'N' => 1}),
+#   'K' => Composition.new(**{'H' => 12, 'C' => 6, 'N' => 2, 'O' => 1}),
+#   'L' => Composition.new(**{'H' => 11, 'C' => 6, 'O' => 1, 'N' => 1}),
+#   'M' => Composition.new(**{'H' => 9, 'C' => 5, 'S' => 1, 'O' => 1, 'N' => 1}),
+#   'N' => Composition.new(**{'H' => 6, 'C' => 4, 'O' => 2, 'N' => 2}),
+#   'P' => Composition.new(**{'H' => 7, 'C' => 5, 'O' => 1, 'N' => 1}),
+#   'Q' => Composition.new(**{'H' => 8, 'C' => 5, 'O' => 2, 'N' => 2}),
+#   'R' => Composition.new(**{'H' => 12, 'C' => 6, 'N' => 4, 'O' => 1}),
+#   'S' => Composition.new(**{'H' => 5, 'C' => 3, 'O' => 2, 'N' => 1}),
+#   'T' => Composition.new(**{'H' => 7, 'C' => 4, 'O' => 2, 'N' => 1}),
+#   'V' => Composition.new(**{'H' => 9, 'C' => 5, 'O' => 1, 'N' => 1}),
+#   'W' => Composition.new(**{'C' => 11, 'H' => 10, 'N' => 2, 'O' => 1}),
+#   'Y' => Composition.new(**{'H' => 9, 'C' => 9, 'O' => 2, 'N' => 1}),
+#   'U' => Composition.new(**{'H' => 5, 'C' => 3, 'O' => 1, 'N' => 1, 'Se' => 1}),
+#   'O' => Composition.new(**{'H' => 19, 'C' => 12, 'O' => 2, 'N' => 3}),
+#   'H-' => Composition.new(**{'H' => 1}),
+#   '-OH' => Composition.new(**{'O' => 1, 'H' => 1}),
+# })
+# @@std_ion_comp.merge!({
+#   'M' => Composition.new(**{'formula' => ''}),
+#   'M-H2O' => Composition.new(**{'formula' => 'H-2O-1'}),
+#   'M-NH3' => Composition.new(**{'formula' => 'N-1H-3'}),
+#   'a' => Composition.new(**{'formula' => 'H-2O-1' + 'C-1O-1'}),
+#   'a-H2O' => Composition.new(**{'formula' => 'H-2O-1' + 'C-1O-1' + 'H-2O-1'}),
+#   'a-NH3' => Composition.new(**{'formula' => 'H-2O-1' + 'C-1O-1' + 'N-1H-3'}),
+#   'b' => Composition.new(**{'formula' => 'H-2O-1'}),
+#   'b-H2O' => Composition.new(**{'formula' => 'H-2O-1' + 'H-2O-1'}),
+#   'b-NH3' => Composition.new(**{'formula' => 'H-2O-1' + 'N-1H-3'}),
+#   'c' => Composition.new(**{'formula' => 'H-2O-1' + 'NH3'}),
+#   'c-1' => Composition.new(**{'formula' => 'H-2O-1' + 'NH3' + 'H-1'}),
+#   'c-dot' => Composition.new(**{'formula' => 'H-2O-1' + 'NH3' + 'H1'}),
+#   'c+1' => Composition.new(**{'formula' => 'H-2O-1' + 'NH3' + 'H1'}),
+#   'c+2' => Composition.new(**{'formula' => 'H-2O-1' + 'NH3' + 'H2'}),
+#   'c-H2O' => Composition.new(**{'formula' => 'H-2O-1' + 'NH3' + 'H-2O-1'}),
+#   'c-NH3' => Composition.new(**{'formula' => 'H-2O-1'}),
+#   'x' => Composition.new(**{'formula' => 'H-2O-1' + 'CO2'}),
+#   'x-H2O' => Composition.new(**{'formula' => 'H-2O-1' + 'CO2' + 'H-2O-1'}),
+#   'x-NH3' => Composition.new(**{'formula' => 'H-2O-1' + 'CO2' + 'N-1H-3'}),
+#   'y' => Composition.new(**{'formula' => ''}),
+#   'y-H2O' => Composition.new(**{'formula' => 'H-2O-1'}),
+#   'y-NH3' => Composition.new(**{'formula' => 'N-1H-3'}),
+#   'z' => Composition.new(**{'formula' => 'H-2O-1' + 'ON-1H-1'}),
+#   'z-dot' => Composition.new(**{'formula' => 'H-2O-1' + 'ON-1'}),
+#   'z+1' => Composition.new(**{'formula' => 'H-2O-1' + 'ON-1H1'}),
+#   'z+2' => Composition.new(**{'formula' => 'H-2O-1' + 'ON-1H2'}),
+#   'z+3' => Composition.new(**{'formula' => 'H-2O-1' + 'ON-1H3'}),
+#   'z-H2O' => Composition.new(**{'formula' => 'H-2O-1' + 'ON-1H-1' + 'H-2O-1'}),
+#   'z-NH3' => Composition.new(**{'formula' => 'H-2O-1' + 'ON-1H-1' + 'N-1H-3'}),
+# })
 def calculate_mass(*args, **kwargs)
-  composition = kwargs['composition'] ? Composition.new(kwargs['composition']) : Composition.new(*args, **kwargs)
+  composition = kwargs.include?('composition') ? Composition.new(kwargs['composition']) : Composition.new(*args, **kwargs)
   composition.mass(**kwargs)
 end
 
@@ -430,7 +544,7 @@ def fast_mass(sequence, ion_type, charge, **kwargs)
 
   if ion_type
     begin
-      icomp = (kwargs['ion_comp'] || @std_ion_comp)[ion_type]
+      icomp = (kwargs['ion_comp'] || @@std_ion_comp)[ion_type]
     rescue => exception
       raise PyteomicsError.new("Unknown ion type: #{ion_type}")
     end
@@ -468,7 +582,7 @@ def fast_mass2(sequence, ion_type, charge, **kwargs)
 
   if ion_type
     begin
-      icomp = (kwargs['ion_comp'] || @std_ion_comp)[ion_type]
+      icomp = (kwargs['ion_comp'] || @@std_ion_comp)[ion_type]
     rescue => exception
       raise PyteomicsError.new("Unknown ion type: #{ion_type}")      
     end

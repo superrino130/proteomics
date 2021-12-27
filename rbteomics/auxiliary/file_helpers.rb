@@ -205,7 +205,6 @@ class FileReader < IteratorContextManager
 
   def __init__(source, **kwargs)
     func = kwargs['parser_func']
-    p [kwargs]
     # super(*kwargs[:args], parser_func: func, **kwargs[:kwargs])
     # super(*kwargs[:args], parser_func: func, **kwargs[:kwargs])
     super(kwargs[:args], parser_func: func, **kwargs[:kwargs])

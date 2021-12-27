@@ -7,6 +7,8 @@ GEM
     debase (0.2.4.1)
       debase-ruby_core_source (>= 0.10.2)
     debase-ruby_core_source (0.10.13)
+    matplotlib (1.2.0)
+      pycall (>= 1.0.0)
     minitest (5.15.0)
     minitest-reporters (1.4.3)
       ansi
@@ -20,6 +22,7 @@ GEM
       pycall (>= 1.0.0)
     pycall (1.4.1)
     rake (13.0.6)
+    rcodetools (0.8.5.0)
     ruby-debug-ide (0.7.3)
       rake (>= 0.8.1)
     ruby-progressbar (1.11.0)
@@ -30,8 +33,10 @@ PLATFORMS
 DEPENDENCIES
   bio
   debase
+  matplotlib
   minitest-reporters
   pandas
+  rcodetools
   ruby-debug-ide
 
 BUNDLED WITH

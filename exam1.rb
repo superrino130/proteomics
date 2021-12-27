@@ -4,6 +4,8 @@
 require 'zlib'
 # import matplotlib.pyplot as plt
 # import numpy as np
+require 'matplotlib/pyplot'
+plt = Matplotlib::Pyplot
 require 'numpy'
 np = Numpy
 # from pyteomics import fasta, parser, mass, achrom, electrochem, auxiliary
@@ -12,6 +14,7 @@ require_relative 'rbteomics/auxiliary/utils'
 require_relative 'rbteomics/mass/mass'
 require_relative 'rbteomics/parser'
 require_relative 'rbteomics/electrochem'
+require_relative 'rbteomics/achrom'
 require 'set'
 require 'open-uri'
 
@@ -52,4 +55,23 @@ peptides.each do |peptide|
   peptide['mass'] = calculate_mass(peptide['parsed_sequence'])
   peptide['m/z'] = calculate_mass(peptide['parsed_sequence'], {'charge' => peptide['charge']})
 end
-print('Done!')
+puts 'Done!'
+
+puts 'Calculating the retention time...'
+peptides.each do |peptide|
+  peptide['RT_RP'] = calculate_RT(
+    peptide['parsed_sequence'],
+    RCs_zubarev)
+peptide['RT_normal'] = calculate_RT(
+    peptide['parsed_sequence'],
+    RCs_yoshida_lc)
+end
+
+plt.figure()
+plt.hist(peptides.map{ _1['m/z'] },
+    bins = 2000,
+    range=[0,4000])
+plt.xlabel('m/z, Th')
+plt.ylabel('# of peptides within 2 Th bin')
+
+plt.show()

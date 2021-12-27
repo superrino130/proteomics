@@ -5,9 +5,14 @@
 次のgemが必要です。
 ```ruby
 gem "bio"
+gem "pandas"
+gem "matplotlib"
 ```
 `fasta` 形式は `bioruby` を利用しています。
 その他のファイル形式についての実装を計画中です。
+
+`pandas`を指定すると`pycall`や`numpy`がインストールされます。
+https://rubygems.org/gems/pandas/versions/0.1.0?locale=ja
 # 進捗状況
 
 [EXAMPLE 1: UNRAVELLING THE PEPTIDOME - Pyteomics](https://pyteomics.readthedocs.io/en/latest/examples/example_fasta.html) の
@@ -45,14 +50,16 @@ peptides = [peptide for peptide in peptides if peptide['length'] <= 100]
 peptides.size = 188548
 ```
 更に、
+```python
+# 途中省略
+
+plt.figure()
+plt.hist(peptides.map{ _1['m/z'] },
+    bins = 2000,
+    range=[0,4000])
+plt.xlabel('m/z, Th')
+plt.ylabel('# of peptides within 2 Th bin')
+
+plt.show()
 ```
-print('Calculating the mass, charge and m/z...')
-for peptide in peptides:
-    peptide['charge'] = int(round(
-        electrochem.charge(peptide['parsed_sequence'], pH=2.0)))
-    peptide['mass'] = mass.calculate_mass(peptide['parsed_sequence'])
-    peptide['m/z'] = mass.calculate_mass(peptide['parsed_sequence'],
-        charge=peptide['charge'])
-print('Done!')
-```
-まで動作します。
+を経て、グラフが表示されます。

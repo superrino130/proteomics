@@ -48,7 +48,7 @@ def length(sequence, **kwargs)
     num_term_groups += 1 if is_term_mod(parsed_sequence[-1])
     return parsed_sequence.size - num_term_groups
   elsif sequence.instance_of?(Hash)
-    return sequence.select{ |k, v| is_term_mod(k) }.sum
+    return sequence.sum{ |k, v| is_term_mod(k).! ? v : 0 }
   end
 
   raise PyteomicsError.new('Unsupported type of sequence.')
@@ -103,7 +103,7 @@ def parse(sequence, show_unmodified_termini=false, split=false, allow_unknown_mo
   end
   nterm, cterm = (['', nil, 0, false, [], {}].include?(n).! ? n : STD_nterm), (['', nil, 0, false, [], {}].include?(c).! ? c : STD_cterm)
   if !!labels
-    labels = Set.new(labels)
+    labels = labels.map{ _1.split('') }
     [n, c].zip([STD_nterm, STD_cterm]).each do |term, std_term|
       if ['', nil, 0, [], {}].include?(term).! && labels.include?(term).! && allow_unknown_modifications.!
         raise PyteomicsError.new("Unknown label: #{term}")
@@ -123,14 +123,15 @@ def parse(sequence, show_unmodified_termini=false, split=false, allow_unknown_mo
 
   if ['', nil, 0, false, [], {}].include?(show_unmodified_termini).! || nterm != STD_nterm
     if ['', nil, 0, false, [], {}].include?(split).!
-      parsed_sequence[0] = [nterm, ] + parsed_sequence[0]
+      # parsed_sequence[0] = [nterm, ] + parsed_sequence[0]
+      parsed_sequence[0] = [nterm] + parsed_sequence[0].compact
     else
       parsed_sequence.insert(0, nterm)
     end
   end
   if ['', nil, 0, false, [], {}].include?(show_unmodified_termini).! || cterm != STD_cterm
     if ['', nil, 0, false, [], {}].include?(split).!
-      parsed_sequence[-1] = parsed_sequence[-1] + [cterm,]
+      parsed_sequence[-1] = parsed_sequence[-1].compact + [cterm]
     else
       parsed_sequence << cterm
     end
@@ -210,22 +211,22 @@ def amino_acid_composition(sequence, show_unmodified_termini=false, term_aa=fals
 
   aa_dict = BasicComposition.new()
 
-  if ['', nil, 0, [], {}].include?(term_aa).!
+  if ['', nil, false, 0, [], {}].include?(term_aa).!
     nterm_aa_position = is_term_mod(parsed_sequence[0]) ? 1 : 0
     cterm_aa_position = (
       is_term_mod(parsed_sequence[-1]) ? parsed_sequence.size - 2 : parsed_sequence.size - 1
     )
     if parsed_sequence.size > 1
-      aa_dict['cterm' + parsed_sequence.delete(cterm_aa_position)] = 1
+      aa_dict.defaultdict['cterm' + parsed_sequence.delete_at(cterm_aa_position)] = 1
     end
-    aa_dict['nterm' + parsed_sequence.delete(nterm_aa_position)] = 1
+    aa_dict.defaultdict['nterm' + parsed_sequence.delete_at(nterm_aa_position)] = 1
   end
 
   parsed_sequence.each do |aa|
-    aa_dict[aa] += 1
+    aa_dict.defaultdict[aa] += 1
   end
 
-  aa_dict
+  aa_dict.defaultdict
 end
 
 class Deque
