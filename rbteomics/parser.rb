@@ -97,25 +97,27 @@ def parse(sequence, show_unmodified_termini=false, split=false, allow_unknown_mo
   _modX_split = /([^A-Z-]*)([A-Z])/
   _modX_group = /[^A-Z-]*[A-Z]/
   if ['', nil, 0, false, [], {}].include?(split).!
-    parsed_sequence = body.scan(_modX_split).map{ _1[0] ? _1 : [_1[1]] }
+    parsed_sequence = body.scan(_modX_split).map{ ['', 0, nil, false, [], {}].include?(_1[0]).! ? _1 : [_1[1]] }
   else
     parsed_sequence = body.scan(_modX_group)
   end
   nterm, cterm = (['', nil, 0, false, [], {}].include?(n).! ? n : STD_nterm), (['', nil, 0, false, [], {}].include?(c).! ? c : STD_cterm)
   if !!labels
-    labels = labels.map{ _1.split('') }
+    labels = labels.keys
     [n, c].zip([STD_nterm, STD_cterm]).each do |term, std_term|
       if ['', nil, 0, [], {}].include?(term).! && labels.include?(term).! && allow_unknown_modifications.!
         raise PyteomicsError.new("Unknown label: #{term}")
       end
     end
     parsed_sequence.each do |group|
-      if ['', nil, 0, [], {}].include?(split).!
+      if ['', nil, 0, false, [], {}].include?(split).!
         mod, x = group.size == 2 ? group : ['', group[0]]
       else
-        mod, x = _modX_split.match(group)
+        m = _modX_split.match(group)
+        mod = m[1]
+        x = m[0]
       end
-      if (mod.! && labels.include?(x).!) || ((labels.include?(mod + x) || labels.include?(x)).! && (labels.include?(mod) || allow_unknown_modifications))
+      if (mod != '' && labels.include?(x).!) || ((labels.include?(mod + x) || labels.include?(x)).! && (labels.include?(mod) || allow_unknown_modifications))
         raise PyteomicsError.new("Unknown label: #{group}")
       end
     end
@@ -123,7 +125,6 @@ def parse(sequence, show_unmodified_termini=false, split=false, allow_unknown_mo
 
   if ['', nil, 0, false, [], {}].include?(show_unmodified_termini).! || nterm != STD_nterm
     if ['', nil, 0, false, [], {}].include?(split).!
-      # parsed_sequence[0] = [nterm, ] + parsed_sequence[0]
       parsed_sequence[0] = [nterm] + parsed_sequence[0].compact
     else
       parsed_sequence.insert(0, nterm)

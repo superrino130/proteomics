@@ -11,6 +11,7 @@ np = Numpy
 # from pyteomics import fasta, parser, mass, achrom, electrochem, auxiliary
 require_relative 'rbteomics/fasta'
 require_relative 'rbteomics/auxiliary/utils'
+require_relative 'rbteomics/auxiliary/math'
 require_relative 'rbteomics/mass/mass'
 require_relative 'rbteomics/parser'
 require_relative 'rbteomics/electrochem'
@@ -53,7 +54,7 @@ puts 'Calculating the mass, charge and m/z...'
 peptides.each do |peptide|
   peptide['charge'] = charge(peptide['parsed_sequence'], pH=2.0).round
   peptide['mass'] = calculate_mass(peptide['parsed_sequence'])
-  peptide['m/z'] = calculate_mass(peptide['parsed_sequence'], {'charge' => peptide['charge']})
+  peptide['m/z'] = calculate_mass(peptide['parsed_sequence'], **{'charge' => peptide['charge']})
 end
 puts 'Done!'
 
@@ -62,16 +63,70 @@ peptides.each do |peptide|
   peptide['RT_RP'] = calculate_RT(
     peptide['parsed_sequence'],
     RCs_zubarev)
-peptide['RT_normal'] = calculate_RT(
+  peptide['RT_normal'] = calculate_RT(
     peptide['parsed_sequence'],
     RCs_yoshida_lc)
 end
 
 plt.figure()
 plt.hist(peptides.map{ _1['m/z'] },
-    bins = 2000,
-    range=[0,4000])
-plt.xlabel('m/z, Th')
+    bins: 2000,
+    range: [0, 4000])
+plt.xlabel('m/z, Th - Ruby')
 plt.ylabel('# of peptides within 2 Th bin')
+
+plt.show()
+
+plt.figure()
+plt.hist(peptides.map{ _1['charge'] },
+    bins: 20,
+    range: [0, 10])
+plt.xlabel('charge, e - Ruby')
+plt.ylabel('# of peptides')
+
+plt.show()
+
+x = peptides.map{ _1['RT_RP'] }
+y = peptides.map{ _1['RT_normal'] }
+heatmap, xbins, ybins = np.histogram2d(x, y, bins=100)
+heatmap[heatmap == 0] = np.nan
+a, b, r, stderr = linear_regression(x,y)
+
+plt.figure()
+plt.imshow(heatmap)
+plt.xlabel('RT on RP, min - Ruby')
+plt.ylabel('RT on normal phase, min')
+plt.title("All tryptic peptides, RT correlation = #{r}")
+
+plt.show()
+
+x = peptides.map{ _1['m/z'] }
+y = peptides.map{ _1['RT_RP'] }
+heatmap, xbins, ybins = np.histogram2d(x, y,
+    bins=[150, 2000],
+    range=[[0, 4000], [0, 150]])
+heatmap[heatmap == 0] = np.nan
+a, b, r, stderr = linear_regression(x,y)
+
+plt.figure()
+plt.imshow(heatmap,
+    aspect: 'auto',
+    origin: 'lower')
+plt.xlabel('m/z, Th - Ruby')
+plt.ylabel('RT on RP, min')
+plt.title("All tryptic peptides, correlation = #{r}")
+
+plt.show()
+
+close_mass_peptides = peptides.select{ 700.0 <= _1['m/z'] && _1['m/z'] <= 701.0 }
+x = close_mass_peptides.map{ _1['RT_RP'] }
+y = close_mass_peptides.map{ _1['RT_normal'] }
+a, b, r, stderr = linear_regression(x, y)
+
+plt.figure()
+plt.scatter(x, y)
+plt.xlabel('RT on RP, min - Ruby')
+plt.ylabel('RT on normal phase, min')
+plt.title("Tryptic peptides with m/z=700-701 Th\nRT correlation = #{r}")
 
 plt.show()

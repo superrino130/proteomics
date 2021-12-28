@@ -156,8 +156,10 @@ class Composition < BasicComposition
   def _from_sequence(sequence, aa_comp)
     parsed_sequence = parse(
         sequence,
-        labels=aa_comp,
-        show_unmodified_termini=true)
+        # labels=aa_comp,
+        show_unmodified_termini=true,
+        **{'labels' => aa_comp}
+      )
     _from_parsed_sequence(parsed_sequence, aa_comp)
   end
 
@@ -226,13 +228,13 @@ class Composition < BasicComposition
     end
 
     ion_comp = kwargs['ion_comp'] || @@std_ion_comp
-    if [0, nil, false].include?(kwargs['ion_type']).! && kwargs['ion_type'].empty?.!
+    if ['', 0, nil, false, [], {}].include?(kwargs['ion_type']).!
       @defaultdict.merge(ion_comp[kwargs['ion_type']])
     end
 
     charge = @defaultdict['H+']
-    if ['', 0, nil, false].include?(kwargs['charge']).! && kwargs['charge'].empty?.!
-      if [0, nil, false].include?(charge).! && charge.empty?.!
+    if ['', 0, nil, false, [], {}].include?(kwargs['charge']).!
+      if ['', 0, nil, false, [], {}].include?(charge).!
         raise PyteomicsError.new("Charge is specified both by the number of protons and 'charge' in kwargs")
       end
       charge = kwargs['charge']
@@ -260,7 +262,7 @@ class Composition < BasicComposition
 
     charge = kwargs['charge'] || composition['H+']
     if ['', 0, nil, false, [], {}].include?(charge).!
-      mass += mass_data['H+'][0][0] * charge if not composition['H+']
+      mass += mass_data['H+'][0][0] * charge if ['', 0, nil, false, [], {}].include?(composition['H+'])
       mass /= charge
     end
     mass

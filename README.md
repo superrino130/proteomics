@@ -63,3 +63,4 @@ plt.ylabel('# of peptides within 2 Th bin')
 plt.show()
 ```
 を経て、グラフが表示されます。
+![example1実行結果](./example1.png)
