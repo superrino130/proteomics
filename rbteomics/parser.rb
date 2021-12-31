@@ -8,17 +8,12 @@ require_relative 'auxiliary/structures'
 
 STD_amino_acids = ['Q', 'W', 'E', 'R', 'T', 'Y', 'I', 'P', 'A', 'S',
   'D', 'F', 'G', 'H', 'K', 'L', 'C', 'V', 'N', 'M']
-"""modX labels for the 20 standard amino acids."""
 
 STD_nterm = 'H-'
-"""modX label for the unmodified N-terminus."""
 
 STD_cterm = '-OH'
-"""modX label for the unmodified C-terminus."""
 
 STD_labels = STD_amino_acids + [STD_nterm, STD_cterm]
-"""modX labels for the standard amino acids and unmodified termini."""
-
 
 def is_term_mod(label)
   _nterm_mod = /[^-]+-$/
@@ -61,7 +56,7 @@ def _split_label(label)
     raise PyteomicsError.new("Cannot split a non-modX label: #{label}")    
   end
   if mod.!
-    [x,]
+    [x]
   else
     [mod, x]
   end
@@ -199,10 +194,10 @@ def amino_acid_composition(sequence, show_unmodified_termini=false, term_aa=fals
   labels = kwargs['labels']
 
   if sequence.instance_of?(String)
-    parsed_sequence = parse(sequence, show_unmodified_termini, allow_unknown_modifications=allow_unknown_modifications, labels=labels)
+    parsed_sequence = parse(sequence, show_unmodified_termini, allow_unknown_modifications=allow_unknown_modifications, **{'labels' => labels})
   elsif sequence.instance_of?(Array)
     if ['', nil, 0, [], {}].include?(sequence).! && sequence[0].instance_of?(Array)
-      parsed_sequence = parse(sequence.to_s || true, show_unmodified_termini, allow_unknown_modifications=allow_unknown_modifications, labels=labels)
+      parsed_sequence = parse(sequence.to_s || true, show_unmodified_termini, allow_unknown_modifications=allow_unknown_modifications, **{'labels' => labels})
     else
       parsed_sequence = sequence
     end

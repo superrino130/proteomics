@@ -1,8 +1,21 @@
 # from __future__ import division
 # from . import parser
+require_relative 'parser'
 # from .auxiliary import PyteomicsError
 require_relative 'auxiliary/structures'
 # from collections import Iterable, Counter
+
+PK_lehninger = {
+  'E' =>   [[4.25,  -1]],
+  'R' =>   [[12.48,  1]],
+  'Y' =>   [[10.07, -1]],
+  'D' =>   [[3.65,  -1]],
+  'H' =>   [[6.00,  +1]],
+  'K' =>   [[10.53, +1]],
+  'C' =>   [[8.18,  -1]],
+  'H-' =>  [[9.69,  +1]],
+  '-OH' => [[2.34,  -1]],
+}
 
 def charge(sequence, pH, **kwargs)
   peptide_dict, pK = _prepare_charge_dict(sequence, **kwargs)
@@ -15,7 +28,7 @@ end
 
 def _prepare_charge_dict(sequence, **kwargs)
   nterm = cterm = n_aa = c_aa = nil
-  pK = (kwargs['pK'] || @pK_lehninger).dup
+  pK = (kwargs['pK'] || PK_lehninger).dup
   pK_nterm = kwargs['pK_nterm'] || {}
   pK_cterm = kwargs['pK_cterm'] || {}
 
@@ -58,7 +71,7 @@ def _prepare_charge_dict(sequence, **kwargs)
   elsif [String, Array].include?(sequence.class)
     if sequence.instance_of?(String)
       if sequence.match?(/\A\p{Lu}+\z/)
-        parsed_sequence = [STD_nterm] + sequence.to_a + [STD_cterm]
+        parsed_sequence = [STD_nterm] + sequence.split('') + [STD_cterm]
       else
         parsed_sequence = parse(sequence, show_unmodified_termini=true)
       end
@@ -105,18 +118,3 @@ def _charge_for_dict(peptide_dict, pH_list, pK)
 
   charge_list
 end
-
-
-
-
-@pK_lehninger = {
-  'E' =>   [[4.25,  -1]],
-  'R' =>   [[12.48,  1]],
-  'Y' =>   [[10.07, -1]],
-  'D' =>   [[3.65,  -1]],
-  'H' =>   [[6.00,  +1]],
-  'K' =>   [[10.53, +1]],
-  'C' =>   [[8.18,  -1]],
-  'H-' =>  [[9.69,  +1]],
-  '-OH' => [[2.34,  -1]],
-}
