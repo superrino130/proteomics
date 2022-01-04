@@ -25,7 +25,7 @@ with gzip.open('yeast.fasta.gz', mode='rt') as gzfile:
         unique_peptides.update(new_peptides)
 print('Done, {0} sequences obtained!'.format(len(unique_peptides)))
 ```
-の部分まで進んでいます。
+の部分まで進み、
 ```ruby
 Done, 188701 sequences obtained!
 ```
@@ -55,8 +55,8 @@ peptides.size = 188548
 
 plt.figure()
 plt.hist(peptides.map{ _1['m/z'] },
-    bins = 2000,
-    range=[0,4000])
+    bins: 2000,
+    range: [0,4000])
 plt.xlabel('m/z, Th')
 plt.ylabel('# of peptides within 2 Th bin')
 

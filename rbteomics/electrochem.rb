@@ -17,6 +17,96 @@ PK_lehninger = {
   '-OH' => [[2.34,  -1]],
 }
 
+PK_sillero = {
+  'E' =>   [[4.5,  -1]],
+  'R' =>   [[12.0, +1]],
+  'Y' =>   [[10.0, -1]],
+  'D' =>   [[4.0,  -1]],
+  'H' =>   [[6.4,  +1]],
+  'K' =>   [[10.4, +1]],
+  'C' =>   [[9.0,  -1]],
+  'H-' =>  [[8.2,  +1]],
+  '-OH' => [[3.2,  -1]],
+}
+
+PK_dawson = {
+  'E' =>   [[4.3,  -1]],
+  'R' =>   [[12.0, +1]],
+  'Y' =>   [[10.1, -1]],
+  'D' =>   [[3.9,  -1]],
+  'H' =>   [[6.0,  +1]],
+  'K' =>   [[10.5, +1]],
+  'C' =>   [[8.3,  -1]],
+  'H-' =>  [[8.2,  +1]],
+  '-OH' => [[3.2,  -1]],
+}
+
+PK_rodwell = {
+  'E' =>   [[4.25, -1]],
+  'R' =>   [[11.5, +1]],
+  'Y' =>   [[10.7, -1]],
+  'D' =>   [[3.86, -1]],
+  'H' =>   [[6.0,  +1]],
+  'K' =>   [[11.5, +1]],
+  'C' =>   [[8.33, -1]],
+  'H-' =>  [[8.0,  +1]],
+  '-OH' => [[3.1,  -1]],
+}
+
+PK_bjellqvist = {
+  'E' =>   [[4.45, -1]],
+  'R' =>   [[12.0, +1]],
+  'Y' =>   [[10.0, -1]],
+  'D' =>   [[4.05, -1]],
+  'H' =>   [[5.98, +1]],
+  'K' =>   [[10.0, +1]],
+  'C' =>   [[9.0,  -1]],
+  'H-' =>  [[7.5,  +1]],
+  '-OH' => [[3.55, -1]],
+}
+
+PK_nterm_bjellqvist = {
+  'H-' => {
+      'A' => [[7.59, +1]],
+      'M' => [[7.0,  +1]],
+      'S' => [[6.93, +1]],
+      'P' => [[8.36, +1]],
+      'T' => [[6.82, +1]],
+      'V' => [[7.44, +1]],
+      'E' => [[7.7,  +1]]
+  }
+}
+
+PK_cterm_bjellqvist = {
+  '-OH' => {
+      'D' => [[4.55, -1]],
+      'E' => [[4.75, -1]]
+  }
+}
+
+Hydropathicity_KD = {
+  "A" => 1.800,
+  "R" => -4.500,
+  "N" => -3.500,
+  "D" => -3.500,
+  "C" => 2.500,
+  "Q" => -3.500,
+  "E" => -3.500,
+  "G" => -0.400,
+  "H" => -3.200,
+  "I" => 4.500,
+  "L" => 3.800,
+  "K" => -3.900,
+  "M" => 1.900,
+  "F" => 2.800,
+  "P" => -1.600,
+  "S" => -0.800,
+  "T" => -0.700,
+  "W" => -0.900,
+  "Y" => -1.300,
+  "V" => 4.200,
+}
+
 def charge(sequence, pH, **kwargs)
   peptide_dict, pK = _prepare_charge_dict(sequence, **kwargs)
 
@@ -65,8 +155,8 @@ def _prepare_charge_dict(sequence, **kwargs)
     if nterm.nil? || cterm.nil?
       raise PyteomicsError.new('Peptide must have two explicit terminal groups')
     end
-    if (n_aa is None or c_aa is None) and (pK_nterm or pK_cterm)
-      raise PyteomicsError.new('Two terminal residues must be present in peptide (designated as "ntermX" and "ctermX", where "X" is the one-letter residue label). Use ``term_aa=True`` when calling `parser.amino_acid_composition`.')
+    if (n_aa.nil? || c_aa.nil?) && (pK_nterm.empty?.! || pK_cterm.empty?.!)
+      raise PyteomicsError.new("Two terminal residues must be present in peptide (designated as 'ntermX' and 'ctermX', where 'X' is the one-letter residue label). Use 'term_aa=true' when calling 'parser.amino_acid_composition'.")
     end
   elsif [String, Array].include?(sequence.class)
     if sequence.instance_of?(String)
@@ -110,11 +200,50 @@ def _charge_for_dict(peptide_dict, pH_list, pK)
     peptide_dict.each_key do |aa|
       (pK[aa] || []).each do |ionizable_group|
         charge += peptide_dict[aa] * ionizable_group[1] * (
-          1. / (1. + 10 ** (ionizable_group[1] * (pH_value - ionizable_group[0]))))
+          1.0 / (1.0 + 10 ** (ionizable_group[1] * (pH_value - ionizable_group[0]))))
       end
     end
     charge_list << charge
   end
 
   charge_list
+end
+
+def pI(sequence, pI_range: [0.0, 14.0], precision_pI: 0.01, **kwargs)
+  pK = kwargs['pK'] || PK_lehninger.dup
+  pK_nterm = {}
+  pK_cterm = {}
+  if sequence.instance_of?(String) || sequence.instance_of?(Array)
+    pK_nterm = kwargs['pK_nterm'] || {}
+    pK_cterm = kwargs['pK_cterm'] || {}
+  elsif sequence.instance_of?(Hash) && (kwargs.include?('pK_nterm') || kwargs.include?('pK_cterm'))
+    raise PyteomicsError("Can not use terminal features for #{sequence}")
+  end
+  peptide_dict, pK = _prepare_charge_dict(sequence, **{'pK' => pK, 'pK_cterm' => pK_cterm, 'pK_nterm' => pK_nterm})
+  left_x, right_x = pI_range
+  left_y = _charge_for_dict(peptide_dict, [left_x], pK)[0]
+  right_y = _charge_for_dict(peptide_dict, [right_x], pK)[0]
+  while (right_x - left_x) > precision_pI
+    if left_y * right_y > 0
+      return left_y.abs < right_y.abs ? left_x : right_x
+    end
+    middle_x = (left_x + right_x) / 2.0
+    middle_y = _charge_for_dict(peptide_dict, [middle_x], pK)[0]
+    if middle_y * left_y < 0
+      right_x = middle_x
+      right_y = middle_y
+    else
+      left_x = middle_x
+      left_y = middle_y
+    end
+  end
+  (left_x + right_x) / 2.0
+end
+
+def gravy(sequence, hydropathicity: Hydropathicity_KD)
+  begin
+    return sequence.map{hydropathicity[_1]}.sum / sequence.size
+  rescue => exception
+    raise PyteomicsError("Hydropathicity for amino acid {} not provided.".format(e.args[0]))    
+  end
 end

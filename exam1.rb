@@ -103,8 +103,8 @@ plt.show()
 x = peptides.map{ _1['m/z'] }
 y = peptides.map{ _1['RT_RP'] }
 heatmap, xbins, ybins = np.histogram2d(x, y,
-    bins=[150, 2000],
-    range=[[0, 4000], [0, 150]])
+    bins: [150, 2000],
+    range: [[0, 4000], [0, 150]])
 heatmap[heatmap == 0] = np.nan
 a, b, r, stderr = linear_regression(x,y)
 
