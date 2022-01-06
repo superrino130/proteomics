@@ -6,7 +6,7 @@ require_relative 'auxiliary/structures'
 # from . import parser
 require_relative 'parser'
 
-def get_RCs(sequences, rts, lcp=-0.21, term_aa=false, **kwargs)
+def get_RCs(sequences, rts, lcp: -0.21, term_aa: false, **kwargs)
   labels = kwargs['labels']
 
   peptide_dicts = sequences.map{ peptide.instance_of?(Hash).! ? amino_acid_composition(_1, false, term_aa, allow_unknown_modifications=true, labels=labels) : _1 }
@@ -17,7 +17,7 @@ def get_RCs(sequences, rts, lcp=-0.21, term_aa=false, **kwargs)
   end
 end
 
-def get_RCs_vary_lcp(sequences, rts, term_aa=false, lcp_range=[-1.0, 1.0], **kwargs)
+def get_RCs_vary_lcp(sequences, rts, term_aa: false, lcp_range: [-1.0, 1.0], **kwargs)
   labels = kwargs['labels']
 
   best_r = -1.1
@@ -46,7 +46,7 @@ def get_RCs_vary_lcp(sequences, rts, term_aa=false, lcp_range=[-1.0, 1.0], **kwa
   best_rc_dict
 end
 
-def calculate_RT(peptide, rc_dict, raise_no_mod=true)
+def calculate_RT(peptide, rc_dict, raise_no_mod: true)
   amino_acids = rc_dict['aa'].keys.select{ (_1[0...5] == 'nterm' || _1[0...5] == 'cterm').! }
 
   term_aa = false
@@ -60,7 +60,7 @@ def calculate_RT(peptide, rc_dict, raise_no_mod=true)
   if peptide.instance_of?(Hash)
     peptide_dict = peptide
   else
-    peptide_dict = amino_acid_composition(peptide, false, term_aa, allow_unknown_modifications=true, **{'labels' => amino_acids})
+    peptide_dict = amino_acid_composition(peptide, show_unmodified_termini: false, term_aa: term_aa, allow_unknown_modifications: true, **{'labels' => amino_acids})
   end
   rt = 0.0
   peptide_dict.each_key do |aa|

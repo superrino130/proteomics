@@ -2,6 +2,7 @@
 # from collections import deque
 # import itertools as it
 # from .auxiliary import PyteomicsError, memoize, BasicComposition, cvstr, cvquery
+require 'set'
 require_relative 'auxiliary/utils'
 require_relative 'auxiliary/structures'
 
@@ -67,7 +68,7 @@ end
 # _modX_split = re.compile(r'([^A-Z-]*)([A-Z])')
 # _modX_single = re.compile(r'^([^A-Z-]*)([A-Z])$')
 
-def parse(sequence, show_unmodified_termini=false, split=false, allow_unknown_modifications=false, **kwargs)
+def parse(sequence, show_unmodified_termini: false, splitflg: false, allow_unknown_modifications: false, **kwargs)
   sequence = sequence.to_s
   return if sequence.empty?
   _modX_sequence = /^([^-]+-)?((?:[^A-Z-]*[A-Z])+)(-[^-]+)?$/
@@ -91,21 +92,25 @@ def parse(sequence, show_unmodified_termini=false, split=false, allow_unknown_mo
   
   _modX_split = /([^A-Z-]*)([A-Z])/
   _modX_group = /[^A-Z-]*[A-Z]/
-  if ['', nil, 0, false, [], {}].include?(split).!
+  if splitflg
     parsed_sequence = body.scan(_modX_split).map{ ['', 0, nil, false, [], {}].include?(_1[0]).! ? _1 : [_1[1]] }
   else
     parsed_sequence = body.scan(_modX_group)
   end
   nterm, cterm = (['', nil, 0, false, [], {}].include?(n).! ? n : STD_nterm), (['', nil, 0, false, [], {}].include?(c).! ? c : STD_cterm)
-  if !!labels
-    labels = labels.keys
+  if labels.nil?.!
+    if labels.instance_of?(String)
+      labels = Set.new(labels.split(''))
+    else
+      labels = Set.new(labels)
+    end
     [n, c].zip([STD_nterm, STD_cterm]).each do |term, std_term|
       if ['', nil, 0, [], {}].include?(term).! && labels.include?(term).! && allow_unknown_modifications.!
         raise PyteomicsError.new("Unknown label: #{term}")
       end
     end
     parsed_sequence.each do |group|
-      if ['', nil, 0, false, [], {}].include?(split).!
+      if splitflg
         mod, x = group.size == 2 ? group : ['', group[0]]
       else
         m = _modX_split.match(group)
@@ -118,21 +123,21 @@ def parse(sequence, show_unmodified_termini=false, split=false, allow_unknown_mo
     end
   end
 
-  if ['', nil, 0, false, [], {}].include?(show_unmodified_termini).! || nterm != STD_nterm
-    if ['', nil, 0, false, [], {}].include?(split).!
+  if show_unmodified_termini || nterm != STD_nterm
+    if splitflg
       parsed_sequence[0] = [nterm] + parsed_sequence[0].compact
     else
       parsed_sequence.insert(0, nterm)
     end
   end
-  if ['', nil, 0, false, [], {}].include?(show_unmodified_termini).! || cterm != STD_cterm
-    if ['', nil, 0, false, [], {}].include?(split).!
+  if show_unmodified_termini || cterm != STD_cterm
+    if splitflg
       parsed_sequence[-1] = parsed_sequence[-1].compact + [cterm]
     else
       parsed_sequence << cterm
     end
   end
-  parsed_sequence.flatten.compact.reject(&:empty?)
+  parsed_sequence
 end
 
 def valid(*args, **kwargs)
@@ -144,11 +149,11 @@ def valid(*args, **kwargs)
   true
 end
 
-def fast_valid(sequence, labels=Set.new(STD_labels))
+def fast_valid(sequence, labels: Set.new(STD_labels))
   Set.new(sequence).subset?(labels)
 end
 
-def tostring(parsed_sequence, show_unmodified_termini=true)
+def tostring(parsed_sequence, show_unmodified_termini: true)
   parsed_sequence = parsed_sequence.to_a
   labels = []
   nterm = parsed_sequence[0]
@@ -158,7 +163,7 @@ def tostring(parsed_sequence, show_unmodified_termini=true)
     if nterm != STD_nterm || show_unmodified_termini
       labels << nterm
     end
-    labels.concat(parsed_sequence[1..-2])
+    labels.concat(parsed_sequence[1...-1])
     if parsed_sequence.size > 1 && (cterm != STD_cterm || show_unmodified_termini)
       labels << cterm
     end
@@ -166,38 +171,38 @@ def tostring(parsed_sequence, show_unmodified_termini=true)
     if parsed_sequence.size == 1
       g = nterm
       if nterm[0] == STD_nterm && show_unmodified_termini.!
-        g = g[1..-1]
+        g = g[1..]
       end
       if nterm[-1] == STD_cterm && show_unmodified_termini.!
-        g = g[0..-2]
+        g = g[0...-1]
       end
       return g.join('')
     end
     if nterm[0] != STD_nterm || show_unmodified_termini
       labels << nterm.join('')
     else
-      labels << nterm[1..-1].join('')
+      labels << nterm[1..].join('')
     end
-    parsed_sequence[1..-1].map{ labels << _1.join('') }
+    parsed_sequence[1...-1].map{ labels << _1.join('') }
     if parsed_sequence.size > 1
       if cterm[-1] != STD_cterm || show_unmodified_termini
         labels << cterm.join('')
       else
-        labels << cterm[0..-2]
+        labels << cterm[0...-1].join('')
       end
     end
   end
   labels.join('')
 end
 
-def amino_acid_composition(sequence, show_unmodified_termini=false, term_aa=false, allow_unknown_modifications=false, **kwargs)
+def amino_acid_composition(sequence, show_unmodified_termini: false, term_aa: false, allow_unknown_modifications: false, **kwargs)
   labels = kwargs['labels']
 
   if sequence.instance_of?(String)
-    parsed_sequence = parse(sequence, show_unmodified_termini, allow_unknown_modifications=allow_unknown_modifications, **{'labels' => labels})
+    parsed_sequence = parse(sequence, show_unmodified_termini: show_unmodified_termini, allow_unknown_modifications: allow_unknown_modifications, **{'labels' => labels})
   elsif sequence.instance_of?(Array)
     if ['', nil, 0, [], {}].include?(sequence).! && sequence[0].instance_of?(Array)
-      parsed_sequence = parse(sequence.to_s || true, show_unmodified_termini, allow_unknown_modifications=allow_unknown_modifications, **{'labels' => labels})
+      parsed_sequence = parse(sequence.to_s || true, show_unmodified_termini: show_unmodified_termini, allow_unknown_modifications: allow_unknown_modifications, **{'labels' => labels})
     else
       parsed_sequence = sequence
     end
@@ -248,11 +253,11 @@ class Deque
 end
 
 #memoize()
-def cleave(sequence, rule, missed_cleavages=0, min_length=nil, semi=false, exception=nil)
-  Set.new(_cleave(sequence, rule, missed_cleavages, min_length, semi, exception))
+def cleave(sequence, rule, missed_cleavages: 0, min_length: nil, semi: false, exception: nil)
+  Set.new(_cleave(sequence, rule, missed_cleavages: missed_cleavages, min_length: min_length, semi: semi, exception: exception))
 end
 
-def _cleave(sequence, rule, missed_cleavages=0, min_length=nil, semi=false, exception=nil)
+def _cleave(sequence, rule, missed_cleavages: 0, min_length: nil, semi: false, exception: nil)
   if @expasy_rules.include?(rule)
     rule = @expasy_rules[rule]
   elsif @psims_rules.include?(rule)
@@ -347,24 +352,24 @@ end
 }
 
 @psims_rules = {
-  Cvstr.new('2-iodobenzoate', 'MS:1001918') => /(?<=W)/,
-  Cvstr.new('Arg-C', 'MS:1001303') => /(?<=R)(?!P)/,
-  Cvstr.new('Asp-N', 'MS:1001304') => /(?=[BD])/,
-  Cvstr.new('Asp-N ambic', 'MS:1001305') => /(?=[DE])/,
-  Cvstr.new('CNBr', 'MS:1001307') => /(?<=M)/,
-  Cvstr.new('Chymotrypsin', 'MS:1001306') => /(?<=[FYWL])(?!P)/,
-  Cvstr.new('Formic acid', 'MS:1001308') => /((?<=D))|((?=D))/,
-  Cvstr.new('Lys-C', 'MS:1001309') => /(?<=K)(?!P)/,
-  Cvstr.new('Lys-C/P', 'MS:1001310') => /(?<=K)/,
-  Cvstr.new('PepsinA', 'MS:1001311') => /(?<=[FL])/,
-  Cvstr.new('TrypChymo', 'MS:1001312') => /(?<=[FYWLKR])(?!P)/,
-  Cvstr.new('Trypsin', 'MS:1001251') => /(?<=[KR])(?!P)/,
-  Cvstr.new('Trypsin/P', 'MS:1001313') => /(?<=[KR])/,
-  Cvstr.new('V8-DE', 'MS:1001314') => /(?<=[BDEZ])(?!P)/,
-  Cvstr.new('V8-E', 'MS:1001315') => /(?<=[EZ])(?!P)/,
-  Cvstr.new('glutamyl endopeptidase', 'MS:1001917') => /(?<=[^E]E)/,
-  Cvstr.new('leukocyte elastase', 'MS:1001915') => /(?<=[ALIV])(?!P)/,
-  Cvstr.new('proline endopeptidase', 'MS:1001916') => /(?<=[HKR]P)(?!P)/,
+  Cvstr.new('2-iodobenzoate', accession: 'MS:1001918') => /(?<=W)/,
+  Cvstr.new('Arg-C', accession: 'MS:1001303') => /(?<=R)(?!P)/,
+  Cvstr.new('Asp-N', accession: 'MS:1001304') => /(?=[BD])/,
+  Cvstr.new('Asp-N ambic', accession: 'MS:1001305') => /(?=[DE])/,
+  Cvstr.new('CNBr', accession: 'MS:1001307') => /(?<=M)/,
+  Cvstr.new('Chymotrypsin', accession: 'MS:1001306') => /(?<=[FYWL])(?!P)/,
+  Cvstr.new('Formic acid', accession: 'MS:1001308') => /((?<=D))|((?=D))/,
+  Cvstr.new('Lys-C', accession: 'MS:1001309') => /(?<=K)(?!P)/,
+  Cvstr.new('Lys-C/P', accession: 'MS:1001310') => /(?<=K)/,
+  Cvstr.new('PepsinA', accession: 'MS:1001311') => /(?<=[FL])/,
+  Cvstr.new('TrypChymo', accession: 'MS:1001312') => /(?<=[FYWLKR])(?!P)/,
+  Cvstr.new('Trypsin', accession: 'MS:1001251') => /(?<=[KR])(?!P)/,
+  Cvstr.new('Trypsin/P', accession: 'MS:1001313') => /(?<=[KR])/,
+  Cvstr.new('V8-DE', accession: 'MS:1001314') => /(?<=[BDEZ])(?!P)/,
+  Cvstr.new('V8-E', accession: 'MS:1001315') => /(?<=[EZ])(?!P)/,
+  Cvstr.new('glutamyl endopeptidase', accession: 'MS:1001917') => /(?<=[^E]E)/,
+  Cvstr.new('leukocyte elastase', accession: 'MS:1001915') => /(?<=[ALIV])(?!P)/,
+  Cvstr.new('proline endopeptidase', accession: 'MS:1001916') => /(?<=[HKR]P)(?!P)/,
 }
 
 @_psims_index = @cvquery.__call__(@psims_rules)
@@ -539,7 +544,7 @@ def isoforms(sequence, **kwargs)
     end
     strip_std_terms.resume
   elsif format_ == 'str'
-    possible_states.map{ tostring(_1, show_unmodified_termini) }
+    possible_states.map{ tostring(_1, show_unmodified_termini: show_unmodified_termini) }
   else
     raise PyteomicsError("Unsupported value of 'format': #{format_}")
   end

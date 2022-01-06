@@ -8,22 +8,23 @@
 # except NameError:
 #     basestring = (str, bytes)
 #     PY2 = False
+Basestring = String
 PY2 = false
 
 # _UNIT_CV_INTERN_TABLE = dict()
-@_UNIT_CV_INTERN_TABLE = {}
+UNIT_CV_INTERN_TABLE = {}
 
 def clear_unit_cv_table()
-  @_UNIT_CV_INTERN_TABLE.clear
+  UNIT_CV_INTERN_TABLE.clear
 end
 
-def _intern_unit_or_cv(unit_or_cv:)
+def _intern_unit_or_cv(unit_or_cv)
   return nil if unit_or_cv.nil?
   begin
-    return @_UNIT_CV_INTERN_TABLE[unit_or_cv]
+    return UNIT_CV_INTERN_TABLE[unit_or_cv]
   rescue => exception
-    @_UNIT_CV_INTERN_TABLE[unit_or_cv] = unit_or_cv
-    return @_UNIT_CV_INTERN_TABLE[unit_or_cv]
+    UNIT_CV_INTERN_TABLE[unit_or_cv] = unit_or_cv
+    return UNIT_CV_INTERN_TABLE[unit_or_cv]
   end
 end
 
@@ -47,8 +48,8 @@ class PyteomicsError < Exception
 end
 
 class Charge < Integer
-  def initialize(*args, **kwargs)
-    __new__(args, kwargs)
+  def initialize(...)
+    __new__(...)
   end
 
   def __new__(*args, **kwargs)
@@ -75,8 +76,8 @@ end
 class Ion < String
   @_pattern = /([abcxyz]\d+(\-H2O|\-NH3)?)([\+|-]\d+)/
 
-  def initialize(*args, **kwargs)
-    __init__(args, kwargs)
+  def initialize(...)
+    __init__(...)
   end
 
   def __init__(*args, **kwargs)
@@ -91,8 +92,8 @@ class Ion < String
 end
 
 class ChargeList < Array
-  def initialize(*args, **kwargs)
-    __init__(args, kwargs)
+  def initialize(...)
+    __init__(...)
   end
 
   def __init__(*args, **kwargs)
@@ -120,7 +121,7 @@ class ChargeList < Array
   end
 end
 
-def _parse_charge(s, list_only=false)
+def _parse_charge(s, list_only: false)
   if list_only.!
     begin
       return Charge.new(s)
@@ -284,8 +285,8 @@ class BasicComposition < Hash
 end
 
 class MappingOverAttributeProxy
-  def initialize(obj)
-    __init__(obj)
+  def initialize(...)
+    __init__(...)
   end
 
   def __init__(obj)
@@ -335,9 +336,9 @@ class Unitint < Integer
 end
 
 class UnitFloat < Float
-  @__slots__ = ['unit_info', nil]
-  def initialize(value, unit_info)
-    __new__(value, unit_info)
+  def initialize(...)
+    @__slots__ = ['unit_info', nil]
+    __new__(...)
   end
 
   def __new(value, unit_info)
@@ -367,11 +368,14 @@ class UnitFloat < Float
 end
 
 class Unitstr < String
-  if PY2.!
-    __slots__ = ["unit_info"]
+  def initialize(...)
+    if PY2.!
+      __slots__ = ["unit_info"]
+    end
+    __new__(...)
   end
 
-  def __new__(value, unit_info=nil)
+  def __new__(value, unit_info: nil)
     # if PY2 && value.instance_of?(U)
     inst = super.new(cls, value)
     inst.unit_info = unit_info
@@ -401,11 +405,11 @@ end
 class Cvstr < String
   @@_cache = {}
 
-  def initialize(value, accession=nil, unit_accession=nil)
-    __new__(value, accession, unit_accession)
+  def initialize(...)
+    __new__(...)
   end
 
-  def __new__(value, accession=nil, unit_accession=nil)
+  def __new__(value, accession: nil, unit_accession: nil)
     begin
       inst = cls._cache[value]
       return inst if inst.accession == accession && inst.unit_accession == unit_accession
@@ -516,7 +520,7 @@ class CVQueryEngine
     index = _walk_dict(data, {})
   end
 
-  def __call__(data, accession=nil)
+  def __call__(data, accession: nil)
     if accession.nil?
       self.index(data)
     else

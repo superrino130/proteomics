@@ -41,7 +41,7 @@ peptides = unique_peptides.map{ {'sequence' => _1} }
 
 puts 'Parsing peptide sequences...'
 peptides.each do |peptide|
-  peptide['parsed_sequence'] = parse(peptide['sequence'], show_unmodified_termini=true)
+  peptide['parsed_sequence'] = parse(peptide['sequence'], show_unmodified_termini: true)
   peptide['length'] = length(peptide['parsed_sequence'])
 end
 puts 'Done!'

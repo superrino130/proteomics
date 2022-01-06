@@ -107,6 +107,7 @@ class TestEctrochem < Minitest::Test
   end
 
   def test_pI_calculations
+    p [110, pI('H-AAA-OH'), 2.34+9.69]
     assert (pI('H-AAA-OH') - (2.34 + 9.69) / 2.0).abs < 0.01
   end
 
@@ -122,13 +123,13 @@ class TestEctrochem < Minitest::Test
     (0...14).each do |i|
       a = charge('H-ACDEFGH-OH', i)
       b = charge(['H-', 'A', 'C', 'D', 'E', 'F', 'G', 'H', '-OH'], i)
-      assert a.round(7) == b.round(7)
+      assert (a - b).round(7).zero?
     end
 
     (0...14).each do |i|
       a = charge('H-ACDEFGH-OH', i)
       b = charge({'H-' => 1, 'A' => 1, 'C' => 1, 'D' => 1, 'E' => 1, 'F' => 1, 'G' => 1, 'H' => 1, '-OH' => 1}, i)
-      assert a.round(7) == b.round(7)
+      assert (a - b).round(7).zero?
     end
   end
 end

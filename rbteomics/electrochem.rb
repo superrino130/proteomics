@@ -118,7 +118,7 @@ end
 
 def _prepare_charge_dict(sequence, **kwargs)
   nterm = cterm = n_aa = c_aa = nil
-  pK = (kwargs['pK'] || PK_lehninger).dup
+  pK = kwargs['pK'] || PK_lehninger.dup
   pK_nterm = kwargs['pK_nterm'] || {}
   pK_cterm = kwargs['pK_cterm'] || {}
 
@@ -163,7 +163,7 @@ def _prepare_charge_dict(sequence, **kwargs)
       if sequence.match?(/\A\p{Lu}+\z/)
         parsed_sequence = [STD_nterm] + sequence.split('') + [STD_cterm]
       else
-        parsed_sequence = parse(sequence, show_unmodified_termini=true)
+        parsed_sequence = parse(sequence, show_unmodified_termini: true)
       end
     elsif sequence.instance_of?(Array)
       if sequence[0][-1] != '-' || sequence[-1][0] != '-'
