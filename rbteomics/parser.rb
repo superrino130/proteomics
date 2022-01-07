@@ -140,9 +140,9 @@ def parse(sequence, show_unmodified_termini: false, splitflg: false, allow_unkno
   parsed_sequence
 end
 
-def valid(*args, **kwargs)
+def valid(...)
   begin
-    parse(*args, **kwargs)
+    parse(...)
   rescue => exception
     return false
   end
@@ -150,7 +150,11 @@ def valid(*args, **kwargs)
 end
 
 def fast_valid(sequence, labels: Set.new(STD_labels))
-  Set.new(sequence).subset?(labels)
+  if sequence.instance_of?(String)
+    Set.new(sequence.split('')).subset?(labels)
+  else
+    Set.new(sequence).subset?(labels)
+  end
 end
 
 def tostring(parsed_sequence, show_unmodified_termini: true)
@@ -232,9 +236,9 @@ end
 
 class Deque
   attr_accessor :que
-  def initialize(*args)
-    @que = args[0]
-    @maxlen = args[1]
+  def initialize(args, maxlen: nil)
+    @que = args
+    @maxlen = maxlen
   end
 
   def push(args)
@@ -253,66 +257,85 @@ class Deque
 end
 
 #memoize()
-def cleave(sequence, rule, missed_cleavages: 0, min_length: nil, semi: false, exception: nil)
-  Set.new(_cleave(sequence, rule, missed_cleavages: missed_cleavages, min_length: min_length, semi: semi, exception: exception))
+def cleave(...)
+  icleave(...).resume.map{ _2 }.to_set
 end
 
-def _cleave(sequence, rule, missed_cleavages: 0, min_length: nil, semi: false, exception: nil)
-  if @expasy_rules.include?(rule)
-    rule = @expasy_rules[rule]
-  elsif @psims_rules.include?(rule)
-    rule = @psims_rules[rule]
-  elsif @_psims_index.include?(rule)
-    rule = @_psims_index[rule]
-  end
-  exception = @expasy_rules[exception] || exception
-  peptides = []
-  ml = missed_cleavages + 2
-  trange = (0...ml)
-  cleavage_sites = Deque.new([0], maxlen=ml)
-  if min_length.nil?
-    min_length = 1
-  end
-  cl = 1
-  if exception.nil?.!
-    exceptions = Set.new
-    i = 0
-    while m = sequence.match(exception, i)
-      i = m.end(0)
-      exceptions << i
+def icleave(sequence, rule, missed_cleavages: 0, min_length: nil, max_length: nil, semi: false, except: nil, regex: false)
+    rule2 = rule.inspect.gsub(/\//, '')
+    rule2 = rule2.gsub(/\"/, '')
+    if regex.!
+      if EXPASY_rules.include?(rule2)
+        rule = EXPASY_rules[rule2]
+      elsif PSIMS_rules.include?(rule2)
+        rule = PSIMS_rules[rule2]
+      elsif PSIMS_index.include?(rule2)
+        rule = PSIMS_index[rule2]
+      elsif rule2.match(/[a-z]/)
+        warn "Interpreting the rule as a regular expression: #{rule2}. Did you mistype the rule? Specify `regex=True` to silence this warning."
+      end
     end
-    exceptions << nil
-  end
-  a = []
-  i = 0
-  while m = sequence.match(rule, i)
-    i = m.end(0)
-    a << i
-  end
-  a << nil
-  a.each do |i|
-    next if !!exception && exceptions.include?(i)
-    cleavage_sites.push(i)
-    cl += 1 if cl < ml
-    trange.to_a[0...cl - 1].each do |j|
-      seq = sequence[cleavage_sites.que[j]...cleavage_sites.que[-1]]
-      if ['', nil, false, 0, [], {}].include?(seq).! && seq.size >= min_length
-        peptides << seq
-        if ['', nil, false, 0, [], {}].include?(semi).!
-          (min_length...seq.size - 1).map{ peptides << seq[0..._1] }
-          (1...seq.size - min_length + 1).map{ peptides << seq[_1..-1] }
+    except = EXPASY_rules[except] || except
+    peptides = []
+    ml = missed_cleavages + 2
+    trange = (0...ml)
+    cleavage_sites = Deque.new([0], maxlen: ml)
+    if min_length.nil?
+      min_length = 1
+    end
+    if max_length.nil?
+      max_length = sequence.size
+    end
+    cl = 1
+    if except.nil?.!
+      excepts = sequence.scan(except).map{ sequence.index(_1) }
+    end
+    rule3 = %r[#{'^'+rule2}]
+
+    a = []
+    sequence.scan(rule).flatten.compact.uniq.each do |k|
+      sequence.size.times do |i|
+        a << i + k.size if sequence[i..].match(rule3)
+      end
+    end
+    Fiber.new do
+      a.uniq.each do |i|
+      next if except.nil?.! && excepts.include?(i)
+      cleavage_sites.push(i)
+      cl += 1 if cl < ml
+      trange.to_a[0...cl - 1].each do |j|
+        seq = sequence[cleavage_sites.que[j]...cleavage_sites.que[-1]]
+        lenseq = seq.size
+        if i.nil?.!
+          start = i - lenseq
+        else
+          start = sequence.size - lenseq
+        end
+        if ['', 0, nil, false, [], {}].include?(seq).! && min_length <= lenseq && lenseq <= max_length
+          Fiber.yield [start, seq]
+          if semi
+            (min_length...[lenseq, max_length].min).each do |k|
+              Fiber.yield [start, seq[0...k]]
+            end
+            ([1, lenseq - max_length].max...lenseq - min_length + 1).each do |k|
+              Fiber.yield [start + k, seq[k..]]
+            end
+          end
         end
       end
     end
   end
-  peptides
+end
+
+def xcleave(...)
+  icleave(...).resume
 end
 
 def num_sites(sequence, rule, **kwargs)
-  _cleave(sequence, rule, **kwargs).size - 1
+  icleave(sequence, rule, **kwargs).resume.size - 1
 end
 
-@expasy_rules = {
+EXPASY_rules = {
   'arg-c' =>         /R/,
   'asp-n' =>         /\w(?=D)/,
   'bnps-skatole'  => /W/,
@@ -351,7 +374,7 @@ end
   'trypsin_exception' => /((?<=[CD])K(?=D))|((?<=C)K(?=[HY]))|((?<=C)R(?=K))|((?<=R)R(?=[HR]))/,
 }
 
-@psims_rules = {
+PSIMS_rules = {
   Cvstr.new('2-iodobenzoate', accession: 'MS:1001918') => /(?<=W)/,
   Cvstr.new('Arg-C', accession: 'MS:1001303') => /(?<=R)(?!P)/,
   Cvstr.new('Asp-N', accession: 'MS:1001304') => /(?=[BD])/,
@@ -372,7 +395,7 @@ end
   Cvstr.new('proline endopeptidase', accession: 'MS:1001916') => /(?<=[HKR]P)(?!P)/,
 }
 
-@_psims_index = @cvquery.__call__(@psims_rules)
+PSIMS_index = @cvquery.__call__(PSIMS_rules)
 
 def isoforms(sequence, **kwargs)
   def main(group)
@@ -390,13 +413,13 @@ def isoforms(sequence, **kwargs)
     c = true
     if m == 0 && is_term_mod(mod)
       group.insert(0, mod)
-    elsif mod[0] == '-' && (group[-1] == STD_cterm || (group[-1][0] == '-' && override))
+    elsif mod[0] == '-' && (group[-1] == STD_cterm || (group[-1][0] == '-' && @override))
       group[-1] = mod
-    elsif mod[-1] == '-' && (group[0] == STD_nterm || (group[0][-1] == '-' && override))
+    elsif mod[-1] == '-' && (group[0] == STD_nterm || (group[0][-1] == '-' && @override))
       group[0] = mod
     elsif is_term_mod(mod).!
       if ['', nil, false, 0, [], {}].include?(m).! && group[m - 1][-1] != '-'
-        if ['', nil, false, 0, [], {}].include?(override).!
+        if ['', nil, false, 0, [], {}].include?(@override).!
           group[m - 1] = mode
         else
           c = false
@@ -426,10 +449,10 @@ def isoforms(sequence, **kwargs)
   if kwargs.include?('labels')
     parse_kw['labels'] = kwargs['labels'].to_a + fixed_mods.to_a
   end
-  parsed = parse(sequence, true, true, **parse_kw)
-  override = kwargs['override'] || false
+  parsed = parse(sequence, show_unmodified_termini: true, splitflg: true, **parse_kw)
+  @override = kwargs['override'] || false
   show_unmodified_termini = kwargs['show_unmodified_termini'] || false
-  max_mods = kwargs['max_mods']
+  @max_mods = kwargs['@max_mods']
   format_ = kwargs['format'] || 'str'
 
   fixed_mods.each do |cmod, res|
@@ -445,7 +468,7 @@ def isoforms(sequence, **kwargs)
   varmods_non_term.each do |m, r|
     if !!r || r.include?(m0) || r.include?('nterm' + m0) || parsed.size == 1 && r.include?('cterm' + m0)
       applid = apply_mod(parsed[0], m)
-      if !!apply_mod
+      if !!applid
         states[0] << applid
       end
     end
@@ -505,13 +528,13 @@ def isoforms(sequence, **kwargs)
     states[-1].concat(more_states)
   end
 
-  sites = states.select.with_index{ _1[1].size > 1 }
-  if max_mods.nil? || max_mods > sites.size
-    possible_states = states.inject(:product).map(&:flatten)
+  sites = states.select{ _1[1].size > 1 }
+  if @max_mods.nil? || @max_mods > sites.size
+    @possible_states = states.inject(:product).map(&:flatten)
   else
     def state_lists
       Fiber.new do
-        (0..max_mods).to_a.each do |m|
+        (0..@max_mods).to_a.each do |m|
           sites.combination(m).each do |comb|
             skel = states.map{ [_1[0]] }
             comb.each do |i, e|
@@ -522,13 +545,13 @@ def isoforms(sequence, **kwargs)
         end
       end
     end
-    possible_states = state_lists.resume.map{ _1.inject(:product).map(&:flatten) }.inject(&:concat).flatten
+    @possible_states = state_lists.resume.map{ _1.inject(:product).map(&:flatten) }.inject(&:concat).flatten
   end
 
   if format_ == 'split'
     def strip_std_terms
       Fiber.new do
-        possible_states.each do |ps|
+        @possible_states.each do |ps|
           ps = ps.to_a
           if show_unmodified_termini.!
             if ps[0][0] == STD_nterm
@@ -544,12 +567,22 @@ def isoforms(sequence, **kwargs)
     end
     strip_std_terms.resume
   elsif format_ == 'str'
-    possible_states.map{ tostring(_1, show_unmodified_termini: show_unmodified_termini) }
+    @possible_states.map{ tostring(_1, show_unmodified_termini: show_unmodified_termini) }
   else
     raise PyteomicsError("Unsupported value of 'format': #{format_}")
   end
 end
 
 def coverage(protein, peptides)
-
+  require 'numpy'
+  protein = protein.gsub(/[^A-Z]/, '')
+  mask = Numpy.zeros(pritein.size, dtype: Numpy.int8)
+  peptides.each do |peptide|
+    s = peptide.gsub(/[^A-Z]/, '')
+    indices = protein.scan(%r[?=#{peptide.gsub(/[^A-Z]/, '')}]).map{ text.index(_1) }
+    indices.each do |i|
+      mask[i...i + peptide.size] = 1
+    end
+  end
+  mask.sum(dtype: float) / mask.size
 end

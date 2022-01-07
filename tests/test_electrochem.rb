@@ -107,7 +107,6 @@ class TestEctrochem < Minitest::Test
   end
 
   def test_pI_calculations
-    p [110, pI('H-AAA-OH'), 2.34+9.69]
     assert (pI('H-AAA-OH') - (2.34 + 9.69) / 2.0).abs < 0.01
   end
 
