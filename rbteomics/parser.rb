@@ -19,7 +19,7 @@ STD_labels = STD_amino_acids + [STD_nterm, STD_cterm]
 def is_term_mod(label)
   _nterm_mod = /[^-]+-$/
   _cterm_mod = /-[^-]+$/
-  _nterm_mod.match(label) || !!_cterm_mod.match(label)
+  _nterm_mod.match(label) || _cterm_mod.match(label)
 end
 
 def match_modX(label)
@@ -28,7 +28,7 @@ def match_modX(label)
 end
 
 def is_modX(label)
-  !!match_modX(label)
+  match_modX(label).nil?.!
 end
 
 def length(sequence, **kwargs)
@@ -81,7 +81,7 @@ def parse(sequence, show_unmodified_termini: false, splitflg: false, allow_unkno
   end
 
   labels = kwargs['labels']
-  if c.nil? && !!n
+  if c.nil? && n.nil?.!
     labels = STD_labels if labels.nil?
     if n != STD_nterm && labels.include?(n).!
       c = '-' + body
@@ -115,9 +115,10 @@ def parse(sequence, show_unmodified_termini: false, splitflg: false, allow_unkno
       else
         m = _modX_split.match(group)
         mod = m[1]
-        x = m[0]
+        x = m[0].sub(mod,'')
       end
-      if (mod != '' && labels.include?(x).!) || ((labels.include?(mod + x) || labels.include?(x)).! && (labels.include?(mod) || allow_unknown_modifications))
+      if (mod == '' && labels.include?(x).!) ||
+         (labels.include?(mod + x) || (labels.include?(x) && (labels.include?(mod) || allow_unknown_modifications))).!
         raise PyteomicsError.new("Unknown label: #{group}")
       end
     end
@@ -408,10 +409,10 @@ def isoforms(sequence, **kwargs)
   end
 
   def apply_mod(label, mod)
-    group = label.to_a
+    group = label.dup.to_a
     m = main(group)[0]
     c = true
-    if m == 0 && is_term_mod(mod)
+    if m == 0 && is_term_mod(mod).!
       group.insert(0, mod)
     elsif mod[0] == '-' && (group[-1] == STD_cterm || (group[-1][0] == '-' && @override))
       group[-1] = mod
@@ -431,7 +432,7 @@ def isoforms(sequence, **kwargs)
       c = false
     end
     if c
-      group
+      return group
     end
   end
 
@@ -447,17 +448,17 @@ def isoforms(sequence, **kwargs)
   fixed_mods = kwargs['fixed_mods'] || {}
   parse_kw = {}
   if kwargs.include?('labels')
-    parse_kw['labels'] = kwargs['labels'].to_a + fixed_mods.to_a
+    parse_kw['labels'] = kwargs['labels'].to_a + fixed_mods.keys
   end
   parsed = parse(sequence, show_unmodified_termini: true, splitflg: true, **parse_kw)
   @override = kwargs['override'] || false
-  show_unmodified_termini = kwargs['show_unmodified_termini'] || false
+  @show_unmodified_termini = kwargs['show_unmodified_termini'] || false
   @max_mods = kwargs['@max_mods']
   format_ = kwargs['format'] || 'str'
 
   fixed_mods.each do |cmod, res|
     parsed.each_with_index do |group, i|
-      if !!res || res.include?(main(group)[1])
+      if res == true || res.include?(main(group)[1])
         parsed[i] = apply_mod(group, cmod) || parsed[i]
       end
     end
@@ -466,20 +467,20 @@ def isoforms(sequence, **kwargs)
   states = [[parsed[0]]]
   m0 = main(parsed[0])[1]
   varmods_non_term.each do |m, r|
-    if !!r || r.include?(m0) || r.include?('nterm' + m0) || parsed.size == 1 && r.include?('cterm' + m0)
+    if r == true || r.include?(m0) || r.include?('nterm' + m0) || parsed.size == 1 && r.include?('cterm' + m0)
       applid = apply_mod(parsed[0], m)
-      if !!applid
+      if applid.nil?.!
         states[0] << applid
       end
     end
   end
   more_states = []
   varmods_term.each do |m, r|
-    if !!r || r.include?(m0)
+    if r == true || r.include?(m0)
       if m[-1] == '-' || parsed.size == 1
         states[0].each do |group|
           applid = apply_mod(group, m)
-          if !!applid
+          if applid.nil?.!
             more_states << applid
           end
         end
@@ -491,9 +492,9 @@ def isoforms(sequence, **kwargs)
   parsed[1...-1].each do |group|
     gstates = [group]
     varmods_non_term.each do |m, r|
-      if !!r || r.include?(group[-1])
+      if r == true || r.include?(group[-1])
         applid = apply_mod(group, m)
-        if !!applid
+        if applid.nil?.!
           gstates << applid
         end
       end
@@ -505,20 +506,20 @@ def isoforms(sequence, **kwargs)
     states << [parsed[-1]]
     m1 = main(parsed[-1])[1]
     varmods_non_term.each do |m, r|
-      if !!r || r.include?(m1) || r.include?('cterm' + m1) || parsed.size == 1 && r.include?('nterm' + m1)
+      if r == true || r.include?(m1) || r.include?('cterm' + m1) || parsed.size == 1 && r.include?('nterm' + m1)
         applid = apply_mod(parsed[-1], m)
-        if !!applid
+        if applid.nil?.!
           states[-1] << applid
         end
       end
     end
     more_states = []
     varmods_term.each do |m, r|
-      if !!r || r.include?(m1)
+      if r == true || r.include?(m1)
         if m[0] == '-' || parsed.size == 1
           states[-1].each do |group|
             applid = apply_mod(group, m)
-            if !!applid
+            if applid.nil?.!
               more_states << applid
             end
           end
@@ -528,7 +529,7 @@ def isoforms(sequence, **kwargs)
     states[-1].concat(more_states)
   end
 
-  sites = states.select{ _1[1].size > 1 }
+  sites = states.select{ _1[0].size > 1 }
   if @max_mods.nil? || @max_mods > sites.size
     @possible_states = states.inject(:product).map(&:flatten)
   else
@@ -553,7 +554,7 @@ def isoforms(sequence, **kwargs)
       Fiber.new do
         @possible_states.each do |ps|
           ps = ps.to_a
-          if show_unmodified_termini.!
+          if @show_unmodified_termini.!
             if ps[0][0] == STD_nterm
               ps[0] = ps[0][1..-1]
             end
@@ -567,7 +568,7 @@ def isoforms(sequence, **kwargs)
     end
     strip_std_terms.resume
   elsif format_ == 'str'
-    @possible_states.map{ tostring(_1, show_unmodified_termini: show_unmodified_termini) }
+    @possible_states.map{ tostring(_1, show_unmodified_termini: @show_unmodified_termini) }
   else
     raise PyteomicsError("Unsupported value of 'format': #{format_}")
   end
