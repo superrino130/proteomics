@@ -2,7 +2,7 @@ require 'minitest/autorun'
 require_relative '../rbteomics/parser'
 require 'set'
 
-class TestMass < Minitest::Unit::TestCase
+class TestMass < Minitest::Test
   def setup
     @simple_sequences = 10.times.map{ rand(1..20).times.map{ ('A'..'Z').to_a.sample }.join('') }
     @labels = ['A', 'B', 'C', 'N', 'X']
@@ -31,6 +31,7 @@ class TestMass < Minitest::Unit::TestCase
   def test_tostring
     @simple_sequences.each do |seq|
       assert_equal seq, tostring(parse(seq, 'labels' => 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'))
+      p [34, tostring(parse(seq, show_unmodified_termini: true, splitflg: true, 'labels' => 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'), show_unmodified_termini: false)]
       assert_equal seq, tostring(parse(seq, show_unmodified_termini: true, splitflg: true, 'labels' => 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'), show_unmodified_termini: false)
     end 
   end
@@ -114,13 +115,26 @@ class TestMass < Minitest::Unit::TestCase
       modseqs = isoforms(peptide, 'variable_mods' => @potential, 'fixed_mods' => @constant, 'labels' => @labels)
       pp = parse(peptide, 'labels' => @extlabels)
       n = (pp[0] == 'N' ? 1 : 0) + (pp[-1] == 'C' ? 1 : 0)
-      modseqs.each do |p|
-        assert_equal(pp.size, length(p, 'labels' => @extlabels))
+      modseqs.each do |pm|
+        p [118, pp, length(pm, 'labels'=>@extlabels)]
+        assert_equal(pp.size, length(pm, 'labels' => @extlabels))
       end
       assert_equal(modseqs.size, (3 ** pp.count('A')) * (2 ** (pp.count('X') + pp.count('C') + n)))
     end
   end
 
+  # def test_isoforms_maxmods2
+  #   3.times do |j|
+  #     l = [3, 3, 10][j]
+  #     m = [6, 9, 10][j]
+  #     peptide = ['CBA', 'NBN', 'BNCCNXNAXC'][j]
+  #     modseqs = isoforms(peptide, 'variable_mods' => @potential, 'labels' => @labels, 'max_mods' => m, 'format' => 'split')
+  #     pp = parse(peptide, 'labels' => @extlabels, 'split' => true)
+  #     modseqs.each do |ms|
+  #       p ms
+  #     end
+  #   end
+  # end
   def test_isoforms_maxmods
     50.times do |j|
       l = rand(1..10)
@@ -129,6 +143,7 @@ class TestMass < Minitest::Unit::TestCase
       modseqs = isoforms(peptide, 'variable_mods' => @potential, 'labels' => @labels, 'max_mods' => m, 'format' => 'split')
       pp = parse(peptide, 'labels' => @extlabels, 'split' => true)
       modseqs.each do |ms|
+        p [145, pp, ms]
         assert_equal(pp.size, ms.size)
         assert(pp.zip(ms).select{ _1 != _2 }.size <= m)
       end
@@ -155,7 +170,7 @@ class TestMass < Minitest::Unit::TestCase
       l = rand(1..10)
       peptide = l.times.map{ @labels.sample }.join('')
       modseqs = isoforms(peptide, 'variable_mods' => @potential, 'fixed_mods' => @constant, 'labels' => @labels)
-      assert !(valid('H-' + peptide, 'labels' => @labels))
+      assert_equal valid('H-' + peptide, 'labels' => @labels), false
       modseqs.each do |s|
         assert valid(s, 'labels' => @extlabels)
         Set.new(peptide.split('')).each do |aa|

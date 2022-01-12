@@ -106,7 +106,7 @@ def parse(sequence, show_unmodified_termini: false, splitflg: false, allow_unkno
     end
     [n, c].zip([STD_nterm, STD_cterm]).each do |term, std_term|
       if ['', nil, 0, [], {}].include?(term).! && labels.include?(term).! && allow_unknown_modifications.!
-        raise PyteomicsError.new("Unknown label: #{term}")
+        return PyteomicsError.new("Unknown label: #{term}")
       end
     end
     parsed_sequence.each do |group|
@@ -119,7 +119,7 @@ def parse(sequence, show_unmodified_termini: false, splitflg: false, allow_unkno
       end
       if (mod == '' && labels.include?(x).!) ||
          (labels.include?(mod + x) || (labels.include?(x) && (labels.include?(mod) || allow_unknown_modifications))).!
-        raise PyteomicsError.new("Unknown label: #{group}")
+        return PyteomicsError.new("Unknown label: #{group}")
       end
     end
   end
@@ -142,12 +142,17 @@ def parse(sequence, show_unmodified_termini: false, splitflg: false, allow_unkno
 end
 
 def valid(...)
+  m = ''
   begin
-    parse(...)
+    m = parse(...)
   rescue => exception
     return false
   end
-  true
+  if m.instance_of?(PyteomicsError)
+    false
+  else
+    true
+  end
 end
 
 def fast_valid(sequence, labels: Set.new(STD_labels))
@@ -188,10 +193,21 @@ def tostring(parsed_sequence, show_unmodified_termini: true)
     else
       labels << nterm[1..].join('')
     end
-    parsed_sequence[1...-1].map{ labels << _1.join('') }
+    # parsed_sequence[1...-1].map{ labels << _1.join('') }
+    parsed_sequence[1...-1].each do |e|
+      if e.instance_of?(String)
+        labels << e
+      else
+        labels << e.join('')
+      end
+    end
     if parsed_sequence.size > 1
       if cterm[-1] != STD_cterm || show_unmodified_termini
-        labels << cterm.join('')
+        if cterm.instance_of?(String)
+          labels << cterm
+        else
+          labels << cterm.join('')
+        end
       else
         labels << cterm[0...-1].join('')
       end
@@ -313,13 +329,13 @@ def icleave(sequence, rule, missed_cleavages: 0, min_length: nil, max_length: ni
           start = sequence.size - lenseq
         end
         if ['', 0, nil, false, [], {}].include?(seq).! && min_length <= lenseq && lenseq <= max_length
-          Fiber.yield [start, seq]
+          Fiber.yield [start, seq] if block_given?
           if semi
             (min_length...[lenseq, max_length].min).each do |k|
-              Fiber.yield [start, seq[0...k]]
+              Fiber.yield [start, seq[0...k]] if block_given?
             end
             ([1, lenseq - max_length].max...lenseq - min_length + 1).each do |k|
-              Fiber.yield [start + k, seq[k..]]
+              Fiber.yield [start + k, seq[k..]] if block_given?
             end
           end
         end
@@ -468,9 +484,9 @@ def isoforms(sequence, **kwargs)
   m0 = main(parsed[0])[1]
   varmods_non_term.each do |m, r|
     if r == true || r.include?(m0) || r.include?('nterm' + m0) || parsed.size == 1 && r.include?('cterm' + m0)
-      applid = apply_mod(parsed[0], m)
-      if applid.nil?.!
-        states[0] << applid
+      applied = apply_mod(parsed[0], m)
+      if applied.nil?.!
+        states[0] << applied
       end
     end
   end
@@ -479,9 +495,9 @@ def isoforms(sequence, **kwargs)
     if r == true || r.include?(m0)
       if m[-1] == '-' || parsed.size == 1
         states[0].each do |group|
-          applid = apply_mod(group, m)
-          if applid.nil?.!
-            more_states << applid
+          applied = apply_mod(group, m)
+          if applied.nil?.!
+            more_states << applied
           end
         end
       end
@@ -493,9 +509,9 @@ def isoforms(sequence, **kwargs)
     gstates = [group]
     varmods_non_term.each do |m, r|
       if r == true || r.include?(group[-1])
-        applid = apply_mod(group, m)
-        if applid.nil?.!
-          gstates << applid
+        applied = apply_mod(group, m)
+        if applied.nil?.!
+          gstates << applied
         end
       end
     end
@@ -507,9 +523,9 @@ def isoforms(sequence, **kwargs)
     m1 = main(parsed[-1])[1]
     varmods_non_term.each do |m, r|
       if r == true || r.include?(m1) || r.include?('cterm' + m1) || parsed.size == 1 && r.include?('nterm' + m1)
-        applid = apply_mod(parsed[-1], m)
-        if applid.nil?.!
-          states[-1] << applid
+        applied = apply_mod(parsed[-1], m)
+        if applied.nil?.!
+          states[-1] << applied
         end
       end
     end
@@ -518,9 +534,9 @@ def isoforms(sequence, **kwargs)
       if r == true || r.include?(m1)
         if m[0] == '-' || parsed.size == 1
           states[-1].each do |group|
-            applid = apply_mod(group, m)
-            if applid.nil?.!
-              more_states << applid
+            applied = apply_mod(group, m)
+            if applied.nil?.!
+              more_states << applied
             end
           end
         end
@@ -529,9 +545,10 @@ def isoforms(sequence, **kwargs)
     states[-1].concat(more_states)
   end
 
-  sites = states.select{ _1[0].size > 1 }
+  # sites = states.select{ _1[0].size > 1 }
+  sites = states.flatten(1).select{ _1[0].size > 1 }
   if @max_mods.nil? || @max_mods > sites.size
-    @possible_states = states.inject(:product).map(&:flatten)
+    @possible_states = states[0].product(*states[1..])
   else
     def state_lists
       Fiber.new do
@@ -546,7 +563,7 @@ def isoforms(sequence, **kwargs)
         end
       end
     end
-    @possible_states = state_lists.resume.map{ _1.inject(:product).map(&:flatten) }.inject(&:concat).flatten
+    @possible_states = state_lists.resume.map{ |e| e[0].product(*e[1..]) }.inject(&:concat).flatten(1)
   end
 
   if format_ == 'split'
@@ -556,19 +573,32 @@ def isoforms(sequence, **kwargs)
           ps = ps.to_a
           if @show_unmodified_termini.!
             if ps[0][0] == STD_nterm
-              ps[0] = ps[0][1..-1]
+              ps[0] = ps[0][1..]
             end
             if ps[-1][-1] == STD_cterm
-              ps[-1] = ps[-1][-1]
+              ps[-1] = ps[-1][0...-1]
             end
           end
-          yield ps
+          yield ps if block_given?
         end
       end
     end
-    strip_std_terms.resume
+    return strip_std_terms.resume
+    # new_states = []
+    # @possible_states.each do |ps|
+    #   if @show_unmodified_termini.!
+    #     if ps[0][0] == STD_nterm
+    #       ps[0] = ps[0][1..].dup
+    #     end
+    #     if ps[-1][-1] == STD_cterm
+    #       ps[-1] = ps[-1][0...-1].dup
+    #     end
+    #   end
+    #   new_states << ps
+    # end
+    # return new_states
   elsif format_ == 'str'
-    @possible_states.map{ tostring(_1, show_unmodified_termini: @show_unmodified_termini) }
+    return @possible_states.map{ tostring(_1, show_unmodified_termini: @show_unmodified_termini) }
   else
     raise PyteomicsError("Unsupported value of 'format': #{format_}")
   end

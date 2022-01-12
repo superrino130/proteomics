@@ -1,6 +1,8 @@
 # proteomics
 [Pyteomics](https://pyteomics.readthedocs.io/en/latest/) の `Ruby` 版を目指します。
 （仮リポジトリ）
+
+from python 3.7 to ruby 2.7
 # gem
 次のgemが必要です。
 ```ruby
@@ -11,8 +13,13 @@ gem "matplotlib"
 `fasta` 形式は `bioruby` を利用しています。
 その他のファイル形式についての実装を計画中です。
 
+https://rubygems.org/gems/bio
+
 `pandas`を指定すると`pycall`や`numpy`がインストールされます。
-https://rubygems.org/gems/pandas/versions/0.1.0?locale=ja
+
+https://rubygems.org/gems/pandas
+
+https://rubygems.org/gems/matplotlib
 # 進捗状況
 
 [EXAMPLE 1: UNRAVELLING THE PEPTIDOME - Pyteomics](https://pyteomics.readthedocs.io/en/latest/examples/example_fasta.html) の

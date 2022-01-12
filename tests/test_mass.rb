@@ -2,7 +2,7 @@ require 'minitest/autorun'
 require_relative '../rbteomics/mass/mass'
 require_relative '../rbteomics/auxiliary/constants'
 
-class TestMass < Minitest::Unit::TestCase
+class TestMass < Minitest::Test
   def setup
     @mass_data = {
       'A' => {0 => [1.0, 1.0],
