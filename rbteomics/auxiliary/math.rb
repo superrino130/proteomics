@@ -1,7 +1,7 @@
 require_relative './structures'
 require 'numpy'
 
-def linear_regression_vertical(x, y=nil, a=nil, b=nil)
+def linear_regression_vertical(x, y: nil, a: nil, b: nil)
   x = Numpy.array(x, copy=nil)
   if y
     y = Numpy.array(y, copy=nil)
@@ -27,14 +27,14 @@ def linear_regression_vertical(x, y=nil, a=nil, b=nil)
   [a, b, r, stderr]
 end
 
-def linear_regression(x, y=nil, a=nil, b=nil)
-  linear_regression_vertical(x, y, a, b)
+def linear_regression(...)
+  linear_regression_vertical(...)
 end
 
-def linear_regression_perpendicular(x, y=nil)
-  x = Numpy.array(x, copy=nil)
+def linear_regression_perpendicular(x, y: nil)
+  x = Numpy.array(x, copy: nil)
   if !!y
-    y = Numpy.array(y, copy=nil)
+    y = Numpy.array(y, copy: nil)
     data = Numpy.hstack([x.reshape([-1, 1]), y.reshape([-1, 1])])
   else
     if x.shape.size != 2 || x.shape[-1] != 2

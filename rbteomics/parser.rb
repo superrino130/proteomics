@@ -68,7 +68,7 @@ end
 # _modX_split = re.compile(r'([^A-Z-]*)([A-Z])')
 # _modX_single = re.compile(r'^([^A-Z-]*)([A-Z])$')
 
-def parse(sequence, show_unmodified_termini: false, splitflg: false, allow_unknown_modifications: false, **kwargs)
+def parse(sequence, show_unmodified_termini: false, split: false, allow_unknown_modifications: false, **kwargs)
   sequence = sequence.to_s
   return if sequence.empty?
   _modX_sequence = /^([^-]+-)?((?:[^A-Z-]*[A-Z])+)(-[^-]+)?$/
@@ -92,7 +92,7 @@ def parse(sequence, show_unmodified_termini: false, splitflg: false, allow_unkno
   
   _modX_split = /([^A-Z-]*)([A-Z])/
   _modX_group = /[^A-Z-]*[A-Z]/
-  if splitflg
+  if split
     parsed_sequence = body.scan(_modX_split).map{ ['', 0, nil, false, [], {}].include?(_1[0]).! ? _1 : [_1[1]] }
   else
     parsed_sequence = body.scan(_modX_group)
@@ -101,6 +101,8 @@ def parse(sequence, show_unmodified_termini: false, splitflg: false, allow_unkno
   if labels.nil?.!
     if labels.instance_of?(String)
       labels = Set.new(labels.split(''))
+    elsif labels.instance_of?(Hash)
+      labels = labels.keys.to_set
     else
       labels = Set.new(labels)
     end
@@ -110,7 +112,7 @@ def parse(sequence, show_unmodified_termini: false, splitflg: false, allow_unkno
       end
     end
     parsed_sequence.each do |group|
-      if splitflg
+      if split
         mod, x = group.size == 2 ? group : ['', group[0]]
       else
         m = _modX_split.match(group)
@@ -125,14 +127,14 @@ def parse(sequence, show_unmodified_termini: false, splitflg: false, allow_unkno
   end
 
   if show_unmodified_termini || nterm != STD_nterm
-    if splitflg
+    if split
       parsed_sequence[0] = [nterm] + parsed_sequence[0].compact
     else
       parsed_sequence.insert(0, nterm)
     end
   end
   if show_unmodified_termini || cterm != STD_cterm
-    if splitflg
+    if split
       parsed_sequence[-1] = parsed_sequence[-1].compact + [cterm]
     else
       parsed_sequence << cterm
@@ -220,10 +222,10 @@ def amino_acid_composition(sequence, show_unmodified_termini: false, term_aa: fa
   labels = kwargs['labels']
 
   if sequence.instance_of?(String)
-    parsed_sequence = parse(sequence, show_unmodified_termini: show_unmodified_termini, allow_unknown_modifications: allow_unknown_modifications, **{'labels' => labels})
+    parsed_sequence = parse(sequence, show_unmodified_termini: show_unmodified_termini, allow_unknown_modifications: allow_unknown_modifications, 'labels' => labels)
   elsif sequence.instance_of?(Array)
     if ['', nil, 0, [], {}].include?(sequence).! && sequence[0].instance_of?(Array)
-      parsed_sequence = parse(sequence.to_s || true, show_unmodified_termini: show_unmodified_termini, allow_unknown_modifications: allow_unknown_modifications, **{'labels' => labels})
+      parsed_sequence = parse(sequence.to_s || true, show_unmodified_termini: show_unmodified_termini, allow_unknown_modifications: allow_unknown_modifications, 'labels' => labels)
     else
       parsed_sequence = sequence
     end
@@ -466,10 +468,10 @@ def isoforms(sequence, **kwargs)
   if kwargs.include?('labels')
     parse_kw['labels'] = kwargs['labels'].to_a + fixed_mods.keys
   end
-  parsed = parse(sequence, show_unmodified_termini: true, splitflg: true, **parse_kw)
+  parsed = parse(sequence, show_unmodified_termini: true, split: true, **parse_kw)
   @override = kwargs['override'] || false
   @show_unmodified_termini = kwargs['show_unmodified_termini'] || false
-  @max_mods = kwargs['@max_mods']
+  @max_mods = kwargs['max_mods']
   format_ = kwargs['format'] || 'str'
 
   fixed_mods.each do |cmod, res|
@@ -480,13 +482,13 @@ def isoforms(sequence, **kwargs)
     end
   end
 
-  states = [[parsed[0]]]
+  @states = [[parsed[0]]]
   m0 = main(parsed[0])[1]
   varmods_non_term.each do |m, r|
     if r == true || r.include?(m0) || r.include?('nterm' + m0) || parsed.size == 1 && r.include?('cterm' + m0)
       applied = apply_mod(parsed[0], m)
       if applied.nil?.!
-        states[0] << applied
+        @states[0] << applied
       end
     end
   end
@@ -494,7 +496,7 @@ def isoforms(sequence, **kwargs)
   varmods_term.each do |m, r|
     if r == true || r.include?(m0)
       if m[-1] == '-' || parsed.size == 1
-        states[0].each do |group|
+        @states[0].each do |group|
           applied = apply_mod(group, m)
           if applied.nil?.!
             more_states << applied
@@ -503,7 +505,7 @@ def isoforms(sequence, **kwargs)
       end
     end
   end
-  states[0].concat(more_states)
+  @states[0].concat(more_states)
 
   parsed[1...-1].each do |group|
     gstates = [group]
@@ -515,17 +517,17 @@ def isoforms(sequence, **kwargs)
         end
       end
     end
-    states << gstates
+    @states << gstates
   end
 
   if parsed.size > 1
-    states << [parsed[-1]]
+    @states << [parsed[-1]]
     m1 = main(parsed[-1])[1]
     varmods_non_term.each do |m, r|
       if r == true || r.include?(m1) || r.include?('cterm' + m1) || parsed.size == 1 && r.include?('nterm' + m1)
         applied = apply_mod(parsed[-1], m)
         if applied.nil?.!
-          states[-1] << applied
+          @states[-1] << applied
         end
       end
     end
@@ -533,7 +535,7 @@ def isoforms(sequence, **kwargs)
     varmods_term.each do |m, r|
       if r == true || r.include?(m1)
         if m[0] == '-' || parsed.size == 1
-          states[-1].each do |group|
+          @states[-1].each do |group|
             applied = apply_mod(group, m)
             if applied.nil?.!
               more_states << applied
@@ -542,23 +544,27 @@ def isoforms(sequence, **kwargs)
         end
       end
     end
-    states[-1].concat(more_states)
+    @states[-1].concat(more_states)
   end
 
   # sites = states.select{ _1[0].size > 1 }
-  sites = states.flatten(1).select{ _1[0].size > 1 }
-  if @max_mods.nil? || @max_mods > sites.size
-    @possible_states = states[0].product(*states[1..])
+  # sites = states.flatten(1).select{ _1[0].size > 1 }
+  @sites = []
+  @states.each_with_index do |x, i|
+    @sites << [i, x] if x.size > 1
+  end
+  if @max_mods.nil? || @max_mods > @sites.size
+    @possible_states = @states[0].product(*@states[1..])
   else
     def state_lists
       Fiber.new do
-        (0..@max_mods).to_a.each do |m|
-          sites.combination(m).each do |comb|
-            skel = states.map{ [_1[0]] }
+        @max_mods.next.times do |m|
+          @sites.combination(m).each do |comb|
+            skel = @states.map{ [_1[0]] }
             comb.each do |i, e|
               skel[i] = e[1..-1]
             end
-            yield skel
+            yield skel if block_given?
           end
         end
       end
@@ -567,36 +573,36 @@ def isoforms(sequence, **kwargs)
   end
 
   if format_ == 'split'
-    def strip_std_terms
-      Fiber.new do
-        @possible_states.each do |ps|
-          ps = ps.to_a
-          if @show_unmodified_termini.!
-            if ps[0][0] == STD_nterm
-              ps[0] = ps[0][1..]
-            end
-            if ps[-1][-1] == STD_cterm
-              ps[-1] = ps[-1][0...-1]
-            end
-          end
-          yield ps if block_given?
-        end
-      end
-    end
-    return strip_std_terms.resume
-    # new_states = []
-    # @possible_states.each do |ps|
-    #   if @show_unmodified_termini.!
-    #     if ps[0][0] == STD_nterm
-    #       ps[0] = ps[0][1..].dup
-    #     end
-    #     if ps[-1][-1] == STD_cterm
-    #       ps[-1] = ps[-1][0...-1].dup
+    # def strip_std_terms
+    #   Fiber.new do
+    #     @possible_states.each do |ps|
+    #       ps = ps.to_a
+    #       if @show_unmodified_termini.!
+    #         if ps[0][0] == STD_nterm
+    #           ps[0] = ps[0][1..]
+    #         end
+    #         if ps[-1][-1] == STD_cterm
+    #           ps[-1] = ps[-1][0...-1]
+    #         end
+    #       end
+    #       yield ps if block_given?
     #     end
     #   end
-    #   new_states << ps
     # end
-    # return new_states
+    # return strip_std_terms.resume
+    new_states = []
+    @possible_states.each do |ps|
+      if @show_unmodified_termini.!
+        if ps[0][0] == STD_nterm
+          ps[0] = ps[0][1..].dup
+        end
+        if ps[-1][-1] == STD_cterm
+          ps[-1] = ps[-1][0...-1].dup
+        end
+      end
+      new_states << ps
+    end
+    return new_states
   elsif format_ == 'str'
     return @possible_states.map{ tostring(_1, show_unmodified_termini: @show_unmodified_termini) }
   else

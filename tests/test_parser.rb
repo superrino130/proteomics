@@ -6,7 +6,7 @@ class TestMass < Minitest::Test
   def setup
     @simple_sequences = 10.times.map{ rand(1..20).times.map{ ('A'..'Z').to_a.sample }.join('') }
     @labels = ['A', 'B', 'C', 'N', 'X']
-    @extlabels = @labels[0..-1]
+    @extlabels = @labels[0..-1].dup
     @potential = {'pot' => ['X', 'A', 'B'], 'otherpot' => ['A', 'C'], 'N-' => ['N'], '-C' => ['C']}
     @constant = {'const' => ['B']}
     @extlabels.concat(['pot', 'otherpot', 'const', '-C', 'N-'])
@@ -19,20 +19,19 @@ class TestMass < Minitest::Test
   end
 
   def test_parse
-    assert_equal [['P'], ['E'], ['P'], ['T'], ['I'], ['D'], ['E']], parse('PEPTIDE', splitflg: true)
+    assert_equal [['P'], ['E'], ['P'], ['T'], ['I'], ['D'], ['E']], parse('PEPTIDE', split: true)
     assert_equal ['P', 'E', 'P', 'T', 'I', 'D', 'E'], parse('H-PEPTIDE')
     ['PEPTIDE', 'H-PEPTIDE', 'PEPTIDE-OH', 'H-PEPTIDE-OH'].each do |seq|
       assert_equal ['H-', 'P', 'E', 'P', 'T', 'I', 'D', 'E', '-OH'], parse(seq, show_unmodified_termini: true)
     end
     assert_equal ['T', 'E', 'pS', 'T', 'oxM'], parse('TEpSToxM', 'labels' => STD_labels + ['pS', 'oxM'])
-    assert_equal [['H-', 'z', 'P'], ['E'], ['P'], ['z', 'T'], ['I'], ['D'], ['z', 'E', '-OH']], parse('zPEPzTIDzE', show_unmodified_termini: true, splitflg: true, 'labels' => STD_labels + ['z'])
+    assert_equal [['H-', 'z', 'P'], ['E'], ['P'], ['z', 'T'], ['I'], ['D'], ['z', 'E', '-OH']], parse('zPEPzTIDzE', show_unmodified_termini: true, split: true, 'labels' => STD_labels + ['z'])
   end
 
   def test_tostring
     @simple_sequences.each do |seq|
       assert_equal seq, tostring(parse(seq, 'labels' => 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'))
-      p [34, tostring(parse(seq, show_unmodified_termini: true, splitflg: true, 'labels' => 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'), show_unmodified_termini: false)]
-      assert_equal seq, tostring(parse(seq, show_unmodified_termini: true, splitflg: true, 'labels' => 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'), show_unmodified_termini: false)
+      assert_equal seq, tostring(parse(seq, show_unmodified_termini: true, split: true, 'labels' => 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'), show_unmodified_termini: false)
     end 
   end
 
@@ -116,7 +115,6 @@ class TestMass < Minitest::Test
       pp = parse(peptide, 'labels' => @extlabels)
       n = (pp[0] == 'N' ? 1 : 0) + (pp[-1] == 'C' ? 1 : 0)
       modseqs.each do |pm|
-        p [118, pp, length(pm, 'labels'=>@extlabels)]
         assert_equal(pp.size, length(pm, 'labels' => @extlabels))
       end
       assert_equal(modseqs.size, (3 ** pp.count('A')) * (2 ** (pp.count('X') + pp.count('C') + n)))
@@ -141,9 +139,14 @@ class TestMass < Minitest::Test
       m = rand(1..10)
       peptide = l.times.map{ @labels.sample }.join('')
       modseqs = isoforms(peptide, 'variable_mods' => @potential, 'labels' => @labels, 'max_mods' => m, 'format' => 'split')
-      pp = parse(peptide, 'labels' => @extlabels, 'split' => true)
+      pp = parse(peptide, 'labels' => @extlabels, split: true)
       modseqs.each do |ms|
-        p [145, pp, ms]
+        p [144, pp, ms] if pp.size != ms.size
+        mms = pp.zip(ms).select{ _1 != _2 }
+        if mms.size > m
+          p [146, pp, ms]
+          p [147, mms, m, peptide]
+        end
         assert_equal(pp.size, ms.size)
         assert(pp.zip(ms).select{ _1 != _2 }.size <= m)
       end

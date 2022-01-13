@@ -147,16 +147,12 @@ class BasicComposition < Hash
 
   def __init__(*args, **kwargs)
     @defaultdict = Hash.new(0)
-    # @defaultdict.each do |k, v|
-    #   if ['', 0, nil, false, [], {}].include?(v)
-    #     @defaultdict.delete(k)
-    #   end
-    # end
+
     if args
-      @defaultdict.merge(args.tally)
+      @defaultdict.merge!(args.tally)
     end
     if kwargs
-      @defaultdict.merge(kwargs)
+      @defaultdict.merge!(kwargs)
     end
   end
 
@@ -181,10 +177,14 @@ class BasicComposition < Hash
 
   def __add__(other)
     result = @defaultdict.dup
-    other.each do |elem, cnt|
+    other.defaultdict.each do |elem, cnt|
       result[elem] += cnt
     end
     result
+  end
+
+  def +(...)
+    __add__(...)
   end
 
   def __iadd__(other)
@@ -200,10 +200,14 @@ class BasicComposition < Hash
 
   def __sub__(other)
     result = @defaultdict.dup
-    other.each do |elem, cnt|
+    other.defaultdict.each do |elem, cnt|
       result[elem] -= cnt
     end
     result
+  end
+
+  def -(...)
+    __sub__(...)
   end
 
   def __isub__(other)
@@ -224,7 +228,10 @@ class BasicComposition < Hash
     @defaultdict.each do |k, v|
       @defaultdict[k] *= other
     end
-    @defaultdict.class.concat(@defaultdict)
+  end
+
+  def *(...)
+    __mul__(...)
   end
 
   def __imul__(other)
@@ -275,8 +282,11 @@ class BasicComposition < Hash
     return [class_, args, state, list_iterator, dict_iterator]
   end
 
-  def [](key, value)
-    @defaultdict[key] = value
+  # def [](key, value)
+  #   @defaultdict[key] = value
+  # end
+  def [](key)
+    @defaultdict[key]
   end
   
   def defaultdict

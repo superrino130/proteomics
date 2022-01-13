@@ -136,9 +136,11 @@ class Composition < BasicComposition
     split_sequence.each do |group|
       i = 0
       while i < group.size
+        jj = 0
         group.size.next.downto(0) do |j|
+          jj = j
           begin
-            labe = group[i..j].join('')
+            label = group[i...j].join('')
             aa_comp[label].each do |elem, cnt|
               comp[elem] += cnt
             end
@@ -149,7 +151,7 @@ class Composition < BasicComposition
             break
           end
         end
-        raise PyteomicsError.new("Invalid group starting from position #{i + 1}: #{group}") if j == 0
+        raise PyteomicsError.new("Invalid group starting from position #{i + 1}: #{group}") if jj == 0
       end
     end
     _from_composition(comp)
@@ -159,7 +161,7 @@ class Composition < BasicComposition
     parsed_sequence = parse(
         sequence,
         show_unmodified_termini: true,
-        **{'labels' => aa_comp}
+        'labels' => aa_comp
       )
     _from_parsed_sequence(parsed_sequence, aa_comp)
   end
@@ -227,7 +229,7 @@ class Composition < BasicComposition
 
     ion_comp = kwargs['ion_comp'] || STD_ion_comp
     if ['', 0, nil, false, [], {}].include?(kwargs['ion_type']).!
-      @defaultdict.merge(ion_comp[kwargs['ion_type']])
+      @defaultdict.merge!(ion_comp[kwargs['ion_type']])
     end
 
     charge = @defaultdict['H+']
@@ -628,14 +630,14 @@ class Unimod
       new_d['composition'] = comp
       new_d['record_id'] = d.delete('record_id').to_i
       new_d['approved'] = d.delete('approved') == '1'
-      new_d.merge(d)
+      new_d.merge!(d)
       spec = []
       self._xpath('specificity', mod).each do |sp|
         sp_d = sp.attrib
         sp_new_d = {}
         sp_new_d['hidden'] = sp_d.delete('hidden') == '1'
         sp_new_d['spec_group'] = sp_d.delete('spec_group').to_i
-        sp_new_d.merge(sp_d)
+        sp_new_d.merge!(sp_d)
         notes = []
         self._xpath('*', sp).each do |note|
           notes << note.text.strip if note.text || note.text.strip

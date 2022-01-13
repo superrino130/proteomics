@@ -110,7 +110,7 @@ def _zlibNumpress(decoder)
 end
 
 if pynumpress
-  @_default_compression_map.merge(
+  @_default_compression_map.merge!(
     {
       'MS-Numpress short logged float compression': _pynumpressDecompress(pynumpress.decode_slof),
       'MS-Numpress positive integer compression':   _pynumpressDecompress(pynumpress.decode_pic),
