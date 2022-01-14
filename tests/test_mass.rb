@@ -119,12 +119,79 @@ class TestMass < Minitest::Test
     a = []
     'ABCDE'.split('').each do |x|
       @mass_data[x].keys.each do |y|
-          a << x if y != 0
+          a << @mass_data[x][y][0] * @mass_data[x][y][1] if y != 0
       end
     end
     assert_equal calculate_mass('formula' => 'ABCDE',
       'average' => true,
       'mass_data' => @mass_data),
-      a      
+      a.sum
+    
+      [1, 2, 3].each do |charge|
+        assert_equal calculate_mass('formula' => 'ABCDE', 'ion_type' => 'M', 'charge' => charge, 'mass_data' => @mass_data),
+          calculate_mass('formula' => 'ABCDE' + "H+#{charge}", 'mass_data' => @mass_data)
+      
+        assert_equal calculate_mass('formula' => 'ABCDE', 'ion_type' => 'M', 'charge' => charge, 'mass_data' => @mass_data),
+          (calculate_mass('formula' => 'ABCDE', 'mass_data' => @mass_data) + @mass_data['H+'][0][0] * charge) / charge
+
+        e = assert_raises PyteomicsError do
+          calculate_mass('formula' => "ABCDEH+#{charge}",
+            'ion_type' => 'M', 'charge' => charge, 'mass_data' => @mass_data)
+        assert e.message.include?("Charge is specified both by the number of protons and 'charge' in kwargs")
+      end
+    end
+
+    @random_peptides.each do |pep|
+      assert_equal calculate_mass('sequence' => pep, 'aa_comp' => @aa_comp, 'mass_data' => @mass_data, 'ion_comp' => @ion_comp),
+        calculate_mass('parsed_sequence' => parse(pep, 'labels' => ['X', 'Y', 'Z'], show_unmodified_termini: true),
+          'aa_comp' => @aa_comp, 'mass_data' => @mass_data, 'ion_comp' => @ion_comp)
+    end
   end
+
+  def test_most_probable_isotopic_composition
+    assert_equal most_probable_isotopic_composition('formula' => 'F', 'mass_data' => @mass_data),
+      [Composition.new({'F[6]' => 1, 'F[7]'=> 0}, 'mass_data' => @mass_data).defaultdict, 0.7]
+
+    assert_equal most_probable_isotopic_composition('formula' => 'F10', 'mass_data' => @mass_data),
+      [Composition.new({'F[6]' => 7, 'F[7]' => 3}, 'mass_data' => @mass_data), (0.3)**3 * (0.7)**7 * 120]
+    
+    
+    assert_equal most_probable_isotopic_composition('formula' => 'A20F10', 'elements_with_isotopes' => ['F'], 'mass_data' => @mass_data),
+        [Composition.new({'A' => 20, 'F[6]' => 7, 'F[7]' => 3}, 'mass_data' => @mass_data), (0.3)**3 * (0.7)**7 * 120]
+  end
+
+  def test_isotopic_composition_abundance
+    (1...10).to_a.each do |peplen|
+      assert_equal (isotopic_composition_abundance('formula' => 'F[6]' * peplen, 'mass_data' => @mass_data) -
+        @mass_data['F'][6][1] ** peplen).round(7).to_i, 0.0
+
+      assert_equal (isotopic_composition_abundance('formula' => 'AF[6]' * peplen, 'mass_data' => @mass_data) -
+        @mass_data['F'][6][1] ** peplen).round(7).to_i, 0.0
+
+      assert_equal (isotopic_composition_abundance('formula' => 'A[1]F[6]' * peplen, 'mass_data' => @mass_data) -
+          (@mass_data['A'][1][1] * @mass_data['F'][6][1]) ** peplen).round(7).to_i, 0.0
+    end
+  end
+
+  # def test_Unimod_mass
+  #   db = Unimod(gzip.open('unimod.xml.gz'))
+  #   db.mods.each do |x|
+  #     assert 0.00001 < (x['mono_mass'] - calculate_mass(x['composition'], 'mass_data' = > db.mass_data)).abs
+  #   end
+  # end
+
+  def test_Unimod_methods
+
+  end
+
+  def test_nist_mass
+    assert NIST_mass.values.map{ |g| g[0][1] - 1 < 1e-6 }.all?
+
+    NIST_mass.values.each do |g|
+      s = g.sum{ |num, p| num != 0 ? p[1] : 0 }
+      assert (s - 1).abs < 1e-6 || s.abs < 1e-6
+    end
+  end
+
+
 end

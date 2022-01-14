@@ -272,6 +272,10 @@ class BasicComposition < Hash
     end
   end
 
+  def [](...)
+    __setitem__(...)
+  end
+
   def copy()
     @defaultdict.class.concat(@defaultdict)
   end
@@ -280,13 +284,6 @@ class BasicComposition < Hash
     class_, args, state, list_iterator, dict_iterator = super.__reduce__()
     args = []
     return [class_, args, state, list_iterator, dict_iterator]
-  end
-
-  # def [](key, value)
-  #   @defaultdict[key] = value
-  # end
-  def [](key)
-    @defaultdict[key]
   end
   
   def defaultdict

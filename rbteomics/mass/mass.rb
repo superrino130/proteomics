@@ -41,7 +41,7 @@ end
 
 def _parse_isotope_string(label)
   m = ISOTOPE_string.match(label)
-  element_name, num = m[0], m[1]
+  element_name, num = m[0], m[2]
   isotope_num = ['', 0, nil, false, [], {}].include?(num).! ? num.to_i : 0
   [element_name, isotope_num]
 end
@@ -175,7 +175,7 @@ class Composition < BasicComposition
         raise PyteomicsError.new('Unknown chemical element: ' + elem)
       end
       # self[_make_isotope_string(elem, int(isotope) if isotope else 0)] += int(number) if number else 1
-      @defaultdict[_make_isotope_string(elem, isotope.nil? ? 0 : isotope_num.to_i)] += number.nil? ? 1 : number.to_i
+      @defaultdict[_make_isotope_string(elem, ['', 0, nil, false, []].include?(isotope) ? 0 : isotope.to_i)] += number.nil? ? 1 : number.to_i
     end
   end
 
@@ -252,8 +252,8 @@ class Composition < BasicComposition
       element_name, isotope_num = _parse_isotope_string(isotope_string)
       if ['', 0, nil, false, [], {}].include?(isotope_num) && average
         # if isotope_num.! && average
-          mass_data[element_name].each do |isotope, data|
-          mass += (amount * data[0] * data[1]) if isotope
+        mass_data[element_name].each do |isotope, data|
+          mass += (amount * data[0] * data[1]) if ['', 0, nil, false, [], {}].include?(isotope).!
         end
       else
         mass += (amount * mass_data[element_name][isotope_num][0])
@@ -396,21 +396,25 @@ def calculate_mass(*args, **kwargs)
 end
 
 def most_probable_isotopic_composition(*args, **kwargs)
-  composition = kwargs['composition'] ? self[kwargs['composition']] : Composition.new(*args, **kwargs)
+  composition = kwargs.include?('composition') ? Composition.new(kwargs['composition']).defaultdict : Composition.new(*args, **kwargs).defaultdict
 
-  composition.each do |isotope_string|
+  composition.each do |isotope_string, _|
     element_name, isotope_num = _parse_isotope_string(isotope_string)
-    composition[element_name] += composition.pop(isotope_string) if isotope_num
+    if isotope_num != 0
+      i = composition[isotope_string] || 0
+      composition.delete(isotope_string)
+      composition[element_name] += i
+    end
   end
 
   mass_data = kwargs['mass_data'] || NIST_mass
   elements_with_isotopes = kwargs['elements_with_isotopes']
-  isotopic_composition = Composition.new
+  isotopic_composition = Composition.new.defaultdict
 
-  composition.each do |element_name|
+  composition.each do |element_name, _|
     if elements_with_isotopes.! || elements_with_isotopes.include?(element_name)
       # first_iso, second_iso = sorted([(i[0], i[1][1]) for i in mass_data[element_name].items() if i[0]], key=lambda x: -x[1])[:2]
-      first_iso, second_iso = mass_data[element_name].select{ i[0] && i[0] != 0 }.map{ [_1[0], _1[1][1]] }.sorted{ |x| -x[1] }[0..2]
+      first_iso, second_iso = mass_data[element_name].select{ |k, v| ['', 0, nil, false].include?(k).! }.map{ |k, v| [k, v[1]] }.sort_by{ |x| -x[1] }[0...2]
 
       first_iso_str = _make_isotope_string(element_name, first_iso[0])
       isotopic_composition[first_iso_str] = composition[element_name].ceil.to_i * first_iso[1]
@@ -421,15 +425,18 @@ def most_probable_isotopic_composition(*args, **kwargs)
       isotopic_composition[element_name] = composition[element_name]
     end
   end
-  [isotopic_composition, isotopic_composition_abundance(isotopic_composition, mass_data)]
+  # [isotopic_composition, isotopic_composition_abundance(isotopic_composition, mass_data)]
+  a = isotopic_composition
+  b = isotopic_composition_abundance(isotopic_composition, mass_data)
+  [a, b]
 end
 
 def isotopic_composition_abundance(*args, **kwargs)
-  composition = kwargs['composition'] ? Composition.new(kwargs['composition']) : Composition.new(*args, **kwargs)
+  composition = kwargs['composition'] ? Composition.new(kwargs['composition']).defaultdict : Composition.new(*args, **kwargs).defaultdict
 
-  isotopic_composition = Hash.new({})
+  isotopic_composition = Hash.new{ |h, k| h[k] = {} }
 
-  composition.each do |element|
+  composition.each do |element, _|
     element_name, isotope_num = _parse_isotope_string(element)
 
     if isotopic_composition.include?('element_name') && (isotope_num == 0 || isotopic_composition[element_name].include?(0))
@@ -444,7 +451,7 @@ def isotopic_composition_abundance(*args, **kwargs)
     num1 *= isotope_dict.values.sum.to_r
     isotope_dict.each do |isotope_num, isotope_content|
       denom *= isotope_content.to_r
-      num2 *= mass_data[element_name][isotope_num][1] ** isotope_content if isotope_num
+      num2 *= mass_data[element_name][isotope_num][1] ** isotope_content if isotope_num != 0
     end
   end
   num2 * (num1 / denom)
