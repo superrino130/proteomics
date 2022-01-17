@@ -1,6 +1,7 @@
 require 'minitest/autorun'
 require_relative '../rbteomics/mass/mass'
 require_relative '../rbteomics/auxiliary/constants'
+require 'zlib'
 
 class TestMass < Minitest::Test
   def setup
@@ -174,7 +175,7 @@ class TestMass < Minitest::Test
   end
 
   # def test_Unimod_mass
-  #   db = Unimod(gzip.open('unimod.xml.gz'))
+  #   db = Unimod.new(source: Zlib::GzipReader.open('unimod.xml.gz'))
   #   db.mods.each do |x|
   #     assert 0.00001 < (x['mono_mass'] - calculate_mass(x['composition'], 'mass_data' = > db.mass_data)).abs
   #   end
@@ -193,5 +194,71 @@ class TestMass < Minitest::Test
     end
   end
 
+  def test_composition_objects_are_pickleable
+    dict_ = Composition.new(@d, 'mass_data' => @mass_data)
+    formula = Composition.new('formula' => 'ABCDE',
+      'mass_data' => 'ABCDE'.split('').map{ [_1, {0 => {0 => [1.0, 1.0]}}] }.to_h)
+    sequence = Composition.new('sequence' => 'XYZ', 'aa_comp' => @aa_comp)
+    parsed_sequence = Composition.new('parsed_sequence' => ['X', 'Y', 'Z'],
+      'aa_comp' => @aa_comp)
+    split_sequence = Composition.new('split_sequence' => [['X'], ['Y'], ['Z']],
+      'aa_comp' => @aa_comp)
+    
+    assert_equal dict_, Marshal.load(Marshal.dump(dict_))
+    assert_equal formula, Marshal.load(Marshal.dump(formula))
+    assert_equal sequence, Marshal.load(Marshal.dump(sequence))
+    assert_equal parsed_sequence, Marshal.load(Marshal.dump(parsed_sequence))
+    assert_equal split_sequence, Marshal.load(Marshal.dump(split_sequence))
+  end
 
+  def test_aa_mass
+    h2o = calculate_mass('formula' => 'H2O')
+    STD_aa_mass.each do |aa, m|
+      assert_equal m + h2o, fast_mass(aa)
+    end
+  end
+
+  def test_isotopologues
+    peptide = 'XYF'
+    states = [{'F[6]': 1, 'A': 1, 'B': 1, 'D': 1, 'E': 1}, {'F[7]': 1, 'A': 1, 'B': 1, 'D': 1, 'E': 1}]
+    abundances = [0.7, 0.3]
+    kw_common = {'elements_with_isotopes' => 'F', 'aa_comp' => @aa_comp, 'mass_data' => @mass_data}
+    kwlist = [
+      {},
+      {'sequence' => 'XYF'},
+      {'parsed_sequence' => parse('XYF', show_unmodified_termini: true)},
+      {'split_sequence' => parse('XYF', show_unmodified_termini: true, split: true)},
+      {'formula' => 'ABDEF'},
+      {'composition' => Composition.new('sequence' => 'XYF', 'aa_comp' => @aa_comp).defaultdict}]
+    arglist = [[peptide], [], [], [], [], []]
+    arglist.zip(kwlist).each do |args, kw|
+      kwargs = kw_common.dup
+      kwargs.merge(kw)
+      isotopologues = isotopologues(*args, **kwargs)
+      isotopologues.each do |state|
+        i = states.index(state)
+        assert i != -1
+        assert_equal abundances[i].round(7), isotopic_composition_abundance(state,
+          'aa_comp' => @aa_comp, 'mass_data' => @mass_data).round(7)
+      end
+    end
+  end
+
+  def test_isotopologues_with_abundances
+    peptide = 'XYF'
+    states = [{'F[6]': 1, 'A': 1, 'B': 1, 'D': 1, 'E': 1}, {'F[7]': 1, 'A': 1, 'B': 1, 'D': 1, 'E': 1}]
+    abundances = [0.7, 0.3]
+    isotopologues(peptide, 'elements_with_isotopes' => 'F',
+      'aa_comp' => @aa_comp, 'mass_data' => @mass_data, 'report_abundance' => true).each do |state, abundance|
+      i = states.index(state)
+      assert i != -1
+      assert_equal abundances[i].round(7), abundance.round(7)
+    end
+  end
+
+  def test_std_aa_mass
+    STD_aa_mass.each do |key, value|
+      assert_equal value.round(4), calculate_mass('parsed_sequence' => [key]).round(4)
+    end
+  end
 end

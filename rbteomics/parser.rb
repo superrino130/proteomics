@@ -43,7 +43,8 @@ def length(sequence, **kwargs)
     num_term_groups += 1 if is_term_mod(parsed_sequence[0])
     num_term_groups += 1 if is_term_mod(parsed_sequence[-1])
     return parsed_sequence.size - num_term_groups
-  elsif sequence.instance_of?(Hash)
+  # elsif sequence.instance_of?(Hash)
+  elsif sequence.is_a?(Hash)
     return sequence.sum{ |k, v| is_term_mod(k).! ? v : 0 }
   end
 
@@ -227,7 +228,7 @@ def amino_acid_composition(sequence, show_unmodified_termini: false, term_aa: fa
     if ['', nil, 0, [], {}].include?(sequence).! && sequence[0].instance_of?(Array)
       parsed_sequence = parse(sequence.to_s || true, show_unmodified_termini: show_unmodified_termini, allow_unknown_modifications: allow_unknown_modifications, 'labels' => labels)
     else
-      parsed_sequence = sequence
+      parsed_sequence = sequence.dup
     end
   else
     raise PyteomicsError.new("Unsupported type of a sequence. Must be str or list, not #{sequence.class}")
@@ -241,16 +242,16 @@ def amino_acid_composition(sequence, show_unmodified_termini: false, term_aa: fa
       is_term_mod(parsed_sequence[-1]) ? parsed_sequence.size - 2 : parsed_sequence.size - 1
     )
     if parsed_sequence.size > 1
-      aa_dict.defaultdict['cterm' + parsed_sequence.delete_at(cterm_aa_position)] = 1
+      aa_dict['cterm' + parsed_sequence.delete_at(cterm_aa_position)] = 1
     end
-    aa_dict.defaultdict['nterm' + parsed_sequence.delete_at(nterm_aa_position)] = 1
+    aa_dict['nterm' + parsed_sequence.delete_at(nterm_aa_position)] = 1
   end
 
   parsed_sequence.each do |aa|
-    aa_dict.defaultdict[aa] += 1
+    aa_dict[aa] += 1
   end
 
-  aa_dict.defaultdict
+  aa_dict
 end
 
 class Deque
@@ -277,81 +278,62 @@ end
 
 #memoize()
 def cleave(...)
-  icleave(...).resume.map{ _2 }.to_set
+  Set.new(_cleave(...))
 end
 
-def icleave(sequence, rule, missed_cleavages: 0, min_length: nil, max_length: nil, semi: false, except: nil, regex: false)
-    rule2 = rule.inspect.gsub(/\//, '')
-    rule2 = rule2.gsub(/\"/, '')
-    if regex.!
-      if EXPASY_rules.include?(rule2)
-        rule = EXPASY_rules[rule2]
-      elsif PSIMS_rules.include?(rule2)
-        rule = PSIMS_rules[rule2]
-      elsif PSIMS_index.include?(rule2)
-        rule = PSIMS_index[rule2]
-      elsif rule2.match(/[a-z]/)
-        warn "Interpreting the rule as a regular expression: #{rule2}. Did you mistype the rule? Specify `regex=True` to silence this warning."
-      end
+def _cleave(sequence, rule, missed_cleavages: 0, min_length: nil, semi: false, exception: nil)
+  if EXPASY_rules.include?(rule)
+    rule = EXPASY_rules[rule]
+  elsif PSIMS_rules.include?(rule)
+    rule = PSIMS_rules[rule]
+  elsif PSIMS_index.include?(rule)
+    rule = PSIMS_index[rule]
+  end
+  exception = EXPASY_rules[exception] || exception
+  peptides = []
+  ml = missed_cleavages + 2
+  trange = (0...ml)
+  cleavage_sites = Deque.new([0], maxlen: ml)
+  if min_length.nil?
+    min_length = 1
+  end
+  cl = 1
+  if exception.nil?.!
+    exceptions = Set.new
+    i = 0
+    while m = sequence.match(exception, i)
+      i = m.end(0)
+      exceptions << i
     end
-    except = EXPASY_rules[except] || except
-    peptides = []
-    ml = missed_cleavages + 2
-    trange = (0...ml)
-    cleavage_sites = Deque.new([0], maxlen: ml)
-    if min_length.nil?
-      min_length = 1
-    end
-    if max_length.nil?
-      max_length = sequence.size
-    end
-    cl = 1
-    if except.nil?.!
-      excepts = sequence.scan(except).map{ sequence.index(_1) }
-    end
-    rule3 = %r[#{'^'+rule2}]
-
-    a = []
-    sequence.scan(rule).flatten.compact.uniq.each do |k|
-      sequence.size.times do |i|
-        a << i + k.size if sequence[i..].match(rule3)
-      end
-    end
-    Fiber.new do
-      a.uniq.each do |i|
-      next if except.nil?.! && excepts.include?(i)
-      cleavage_sites.push(i)
-      cl += 1 if cl < ml
-      trange.to_a[0...cl - 1].each do |j|
-        seq = sequence[cleavage_sites.que[j]...cleavage_sites.que[-1]]
-        lenseq = seq.size
-        if i.nil?.!
-          start = i - lenseq
-        else
-          start = sequence.size - lenseq
-        end
-        if ['', 0, nil, false, [], {}].include?(seq).! && min_length <= lenseq && lenseq <= max_length
-          Fiber.yield [start, seq] if block_given?
-          if semi
-            (min_length...[lenseq, max_length].min).each do |k|
-              Fiber.yield [start, seq[0...k]] if block_given?
-            end
-            ([1, lenseq - max_length].max...lenseq - min_length + 1).each do |k|
-              Fiber.yield [start + k, seq[k..]] if block_given?
-            end
-          end
+    exceptions << nil
+  end
+  a = []
+  i = 0
+  while m = sequence.match(rule, i)
+    i = m.end(0)
+    a << i
+  end
+  a << nil
+  a.each do |i|
+    next if !!exception && exceptions.include?(i)
+    cleavage_sites.push(i)
+    cl += 1 if cl < ml
+    trange.to_a[0...cl - 1].each do |j|
+      seq = sequence[cleavage_sites.que[j]...cleavage_sites.que[-1]]
+      if ['', nil, false, 0, [], {}].include?(seq).! && seq.size >= min_length
+        peptides << seq
+        if ['', nil, false, 0, [], {}].include?(semi).!
+          (min_length...seq.size - 1).map{ peptides << seq[0..._1] }
+          (1...seq.size - min_length + 1).map{ peptides << seq[_1..-1] }
         end
       end
     end
   end
-end
-
-def xcleave(...)
-  icleave(...).resume
+  peptides
 end
 
 def num_sites(sequence, rule, **kwargs)
-  icleave(sequence, rule, **kwargs).resume.size - 1
+  _cleave(sequence, rule, **kwargs).size - 1
 end
 
 EXPASY_rules = {
@@ -556,53 +538,39 @@ def isoforms(sequence, **kwargs)
   if @max_mods.nil? || @max_mods > @sites.size
     @possible_states = @states[0].product(*@states[1..])
   else
-    def state_lists
-      Fiber.new do
-        @max_mods.next.times do |m|
-          @sites.combination(m).each do |comb|
-            skel = @states.map{ [_1[0]] }
-            comb.each do |i, e|
-              skel[i] = e[1..-1]
-            end
-            yield skel if block_given?
+    @new_state_lists = []
+    def state_lists()
+      @max_mods.next.times do |m|
+        @sites.combination(m).each do |comb|
+          skel = @states.map{ [_1[0]] }.dup
+          comb.each do |i, e|
+            skel[i] = e[1..]
           end
+          @new_state_lists << skel
         end
       end
     end
-    @possible_states = state_lists.resume.map{ |e| e[0].product(*e[1..]) }.inject(&:concat).flatten(1)
+    state_lists()
+    @possible_states = @new_state_lists.map{ |e| e[0].product(*e[1..]) }.inject(&:concat).flatten(1)
   end
 
   if format_ == 'split'
-    # def strip_std_terms
-    #   Fiber.new do
-    #     @possible_states.each do |ps|
-    #       ps = ps.to_a
-    #       if @show_unmodified_termini.!
-    #         if ps[0][0] == STD_nterm
-    #           ps[0] = ps[0][1..]
-    #         end
-    #         if ps[-1][-1] == STD_cterm
-    #           ps[-1] = ps[-1][0...-1]
-    #         end
-    #       end
-    #       yield ps if block_given?
-    #     end
-    #   end
-    # end
-    # return strip_std_terms.resume
-    new_states = []
-    @possible_states.each do |ps|
-      if @show_unmodified_termini.!
-        if ps[0][0] == STD_nterm
-          ps[0] = ps[0][1..].dup
+    @new_states = []
+    def strip_std_terms
+      @possible_states.each do |ps|
+        if @show_unmodified_termini.!
+          if ps[0][0] == STD_nterm
+            ps[0] = ps[0][1..].dup
+          end
+          if ps[-1][-1] == STD_cterm
+            ps[-1] = ps[-1][0...-1].dup
+          end
         end
-        if ps[-1][-1] == STD_cterm
-          ps[-1] = ps[-1][0...-1].dup
-        end
+        @new_states << ps
       end
-      new_states << ps
     end
-    return new_states
+    strip_std_terms()
+    return @new_states
   elsif format_ == 'str'
     return @possible_states.map{ tostring(_1, show_unmodified_termini: @show_unmodified_termini) }
   else

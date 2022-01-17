@@ -106,7 +106,7 @@ heatmap, xbins, ybins = np.histogram2d(x, y,
     bins: [150, 2000],
     range: [[0, 4000], [0, 150]])
 heatmap[heatmap == 0] = np.nan
-a, b, r, stderr = linear_regression(x,y)
+a, b, r, stderr = linear_regression(x, y: y)
 
 plt.figure()
 plt.imshow(heatmap,
@@ -121,7 +121,7 @@ plt.show()
 close_mass_peptides = peptides.select{ 700.0 <= _1['m/z'] && _1['m/z'] <= 701.0 }
 x = close_mass_peptides.map{ _1['RT_RP'] }
 y = close_mass_peptides.map{ _1['RT_normal'] }
-a, b, r, stderr = linear_regression(x, y)
+a, b, r, stderr = linear_regression(x, y: y)
 
 plt.figure()
 plt.scatter(x, y)

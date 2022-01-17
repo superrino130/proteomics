@@ -3,6 +3,7 @@ require 'numpy'
 # np = Numpy
 # from .auxiliary import linear_regression, PyteomicsError
 require_relative 'auxiliary/structures'
+require_relative 'auxiliary/math'
 # from . import parser
 require_relative 'parser'
 
@@ -58,9 +59,9 @@ def calculate_RT(peptide, rc_dict, raise_no_mod: true)
   end
 
   if peptide.instance_of?(Hash)
-    peptide_dict = peptide
+    peptide_dict = peptide.dup
   else
-    peptide_dict = amino_acid_composition(peptide, show_unmodified_termini: false, term_aa: term_aa, allow_unknown_modifications: true, **{'labels' => amino_acids})
+    peptide_dict = amino_acid_composition(peptide, show_unmodified_termini: false, term_aa: term_aa, allow_unknown_modifications: true, 'labels' => amino_acids)
   end
   rt = 0.0
   peptide_dict.each_key do |aa|

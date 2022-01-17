@@ -146,19 +146,23 @@ class BasicComposition < Hash
   end
 
   def __init__(*args, **kwargs)
-    @defaultdict = Hash.new(0)
+    self.default = 0
 
     if args
-      @defaultdict.merge!(args.tally)
+      args.each do |x|
+        self[x] += 1
+      end
     end
     if kwargs
-      @defaultdict.merge!(kwargs)
+      kwargs.each do |k, v|
+        self[k] = v
+      end
     end
   end
 
   def to_s
     # return '{}({})'.format(type(self).__name__, dict.__repr__(self))
-    "#{self.class}(#{@defaultdict.inspect})"
+    "#{self.class}(#{self.inspect})"
   end
 
   def __str__()
@@ -176,8 +180,8 @@ class BasicComposition < Hash
   end
 
   def __add__(other)
-    result = @defaultdict.dup
-    other.defaultdict.each do |elem, cnt|
+    result = self.dup
+    other.each do |elem, cnt|
       result[elem] += cnt
     end
     result
@@ -189,7 +193,7 @@ class BasicComposition < Hash
 
   def __iadd__(other)
     other.each do |elem, cnt|
-      @defaultdict[elem] += cnt
+      self[elem] += cnt
     end
     @defaultdict
   end
@@ -266,15 +270,15 @@ class BasicComposition < Hash
       raise PyteomicsError.new("Only integers allowed as values in Composition, got #{value.class}.")
     end
     if value != 0 # reject 0's
-      super.__setitem__(key, value)
-    elsif @defaultdict.include?(key)
-      @defaultdict.delete(key)
+      self[key] = value
+    elsif self.include?(key)
+      self.delete(key)
     end
   end
 
-  def [](...)
-    __setitem__(...)
-  end
+  # def [](...)
+  #   __setitem__(...)
+  # end
 
   def copy()
     @defaultdict.class.concat(@defaultdict)
@@ -284,11 +288,7 @@ class BasicComposition < Hash
     class_, args, state, list_iterator, dict_iterator = super.__reduce__()
     args = []
     return [class_, args, state, list_iterator, dict_iterator]
-  end
-  
-  def defaultdict
-    @defaultdict
-  end
+  end  
 end
 
 class MappingOverAttributeProxy
