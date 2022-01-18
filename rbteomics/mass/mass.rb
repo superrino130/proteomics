@@ -60,7 +60,7 @@ class Composition < BasicComposition
       else
         begin
           mod, aa = _split_label(aa)
-          chain(aa_comp[mod], aa_comp[aa]).each do | elem, cnt|
+          (aa_comp[mod].to_a + aa_comp[aa].to_a).each do | elem, cnt|
             comp[elem] += cnt
           end
         rescue => exception
@@ -170,7 +170,9 @@ class Composition < BasicComposition
 
     ion_comp = kwargs['ion_comp'] || STD_ion_comp
     if ['', 0, nil, false, [], {}].include?(kwargs['ion_type']).!
-      @defaultdict.merge!(ion_comp[kwargs['ion_type']])
+      ion_comp[kwargs['ion_type']].each do |k, v|
+        self[k] = v
+      end
     end
 
     charge = self['H+']
@@ -275,7 +277,7 @@ def calculate_mass(*args, **kwargs)
 end
 
 def most_probable_isotopic_composition(*args, **kwargs)
-  composition = kwargs.include?('composition') ? Composition.new(kwargs['composition']).defaultdict : Composition.new(*args, **kwargs).defaultdict
+  composition = kwargs.include?('composition') ? Composition.new(kwargs['composition']) : Composition.new(*args, **kwargs)
 
   composition.each do |isotope_string, _|
     element_name, isotope_num = _parse_isotope_string(isotope_string)
@@ -288,7 +290,7 @@ def most_probable_isotopic_composition(*args, **kwargs)
 
   mass_data = kwargs['mass_data'] || NIST_mass
   elements_with_isotopes = kwargs['elements_with_isotopes']
-  isotopic_composition = Composition.new.defaultdict
+  isotopic_composition = Composition.new
 
   composition.each do |element_name, _|
     if elements_with_isotopes.! || elements_with_isotopes.include?(element_name)
@@ -311,7 +313,7 @@ def most_probable_isotopic_composition(*args, **kwargs)
 end
 
 def isotopic_composition_abundance(*args, **kwargs)
-  composition = kwargs['composition'] ? Composition.new(kwargs['composition']).defaultdict : Composition.new(*args, **kwargs).defaultdict
+  composition = kwargs['composition'] ? Composition.new(kwargs['composition']) : Composition.new(*args, **kwargs)
 
   isotopic_composition = Hash.new{ |h, k| h[k] = {} }
 
@@ -343,7 +345,7 @@ def isotopologues(*args, **kwargs)
   mass_data = kwargs['mass_data'] || NIST_mass
   elements_with_isotopes = kwargs['elements_with_isotopes']
   report_abundance = kwargs['report_abundance'] || false
-  composition = kwargs['composition'] ? Composition.new(kwargs['composition']).defaultdict : Composition.new(*args, **kwargs).defaultdict
+  composition = kwargs['composition'] ? Composition.new(kwargs['composition']) : Composition.new(*args, **kwargs)
   other_kw = kwargs.dup
   Composition.new._kw_sources.each do |k|
     other_kw.delete(k)
@@ -375,14 +377,14 @@ def isotopologues(*args, **kwargs)
       if abundance > overall_threshold
         if report_abundance
           [ic, abundance]
-          Fiber.yeild
+          Fiber.yield
         else
           ic
-          Fiber.yeild
+          Fiber.yield
         end
       end
     else
-      Fiber.yeild
+      Fiber.yield
     end
   end
 end

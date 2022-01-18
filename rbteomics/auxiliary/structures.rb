@@ -203,8 +203,8 @@ class BasicComposition < Hash
   end
 
   def __sub__(other)
-    result = @defaultdict.dup
-    other.defaultdict.each do |elem, cnt|
+    result = self.dup
+    other.each do |elem, cnt|
       result[elem] -= cnt
     end
     result
@@ -229,8 +229,8 @@ class BasicComposition < Hash
     if other.instance_of?(Integer).!
       raise PyteomicsError.new('Cannot multiply Composition by non-integer', other)
     end
-    @defaultdict.each do |k, v|
-      @defaultdict[k] *= other
+    self.each do |k, v|
+      self[k] *= other
     end
   end
 

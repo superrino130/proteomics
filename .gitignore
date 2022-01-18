@@ -50,3 +50,7 @@ build-iPhoneSimulator/
 .rvmrc
 /.vscode
 /yeast.fasta.gz
+/example.mgf
+/example.pep.xml
+/example1.png
+/example2.png

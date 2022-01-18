@@ -34,12 +34,12 @@ class TestMass < Minitest::Test
     @random_peptides = (0...10).to_a.map{ (0...20).to_a.map{ 'XYZ'.split('').sample }.join('') }
 
     @aa_comp = {
-            'X' =>   Composition.new({'A' => 1}, 'mass_data' => @mass_data).defaultdict,
-            'Y' =>   Composition.new({'B' => 1}, 'mass_data' => @mass_data).defaultdict,
-            'Z' =>   Composition.new({'C' => 1}, 'mass_data' => @mass_data).defaultdict,
-            'F' =>   Composition.new({'F' => 1}, 'mass_data' => @mass_data).defaultdict,
-            'H-' =>  Composition.new({'D' => 1}, 'mass_data' => @mass_data).defaultdict,
-            '-OH' => Composition.new({'E' => 1}, 'mass_data' => @mass_data).defaultdict,
+            'X' =>   Composition.new({'A' => 1}, 'mass_data' => @mass_data),
+            'Y' =>   Composition.new({'B' => 1}, 'mass_data' => @mass_data),
+            'Z' =>   Composition.new({'C' => 1}, 'mass_data' => @mass_data),
+            'F' =>   Composition.new({'F' => 1}, 'mass_data' => @mass_data),
+            'H-' =>  Composition.new({'D' => 1}, 'mass_data' => @mass_data),
+            '-OH' => Composition.new({'E' => 1}, 'mass_data' => @mass_data),
         }
 
     @ion_comp = {
@@ -47,7 +47,7 @@ class TestMass < Minitest::Test
       'a' => Composition.new({'A' => -1}, 'mass_data' => @mass_data)
     }
 
-    @mods = {'a' => Composition.new({'A' => 1}).defaultdict, 'b' => Composition.new({'B' => 1}).defaultdict}
+    @mods = {'a' => Composition.new({'A' => 1}), 'b' => Composition.new({'B' => 1})}
     @d = {'A' => 1, 'B' => 1, 'C' => 1, 'D' => 1, 'E' => 1}
   end
 
@@ -66,19 +66,19 @@ class TestMass < Minitest::Test
   end
 
   def test_Composition_dict
-    assert_equal Composition.new(@d, 'mass_data' => @mass_data).defaultdict, @d
+    assert_equal Composition.new(@d, 'mass_data' => @mass_data), @d
   end
 
   def test_Composition_formula
-    assert_equal @d, Composition.new('formula' => 'ABCDE', 'mass_data' => {"A"=>{0=>[1.0, 1.0]}, "B"=>{0=>[1.0, 1.0]}, "C"=>{0=>[1.0, 1.0]}, "D"=>{0=>[1.0, 1.0]}, "E"=>{0=>[1.0, 1.0]}}).defaultdict
+    assert_equal @d, Composition.new('formula' => 'ABCDE', 'mass_data' => {"A"=>{0=>[1.0, 1.0]}, "B"=>{0=>[1.0, 1.0]}, "C"=>{0=>[1.0, 1.0]}, "D"=>{0=>[1.0, 1.0]}, "E"=>{0=>[1.0, 1.0]}})
   end
 
   def test_Composition_seq
-    assert_equal @d, Composition.new('sequence' => 'XYZ', 'aa_comp' => @aa_comp).defaultdict
+    assert_equal @d, Composition.new('sequence' => 'XYZ', 'aa_comp' => @aa_comp)
   end
 
   def test_Composition_pseq
-    assert_equal Composition.new('split_sequence' => [['X'], ['Y'], ['Z']], 'aa_comp' => @aa_comp).defaultdict,
+    assert_equal Composition.new('split_sequence' => [['X'], ['Y'], ['Z']], 'aa_comp' => @aa_comp),
       {'A' => 1, 'B' => 1, 'C' => 1}
   end
 
@@ -151,26 +151,26 @@ class TestMass < Minitest::Test
 
   def test_most_probable_isotopic_composition
     assert_equal most_probable_isotopic_composition('formula' => 'F', 'mass_data' => @mass_data),
-      [Composition.new({'F[6]' => 1, 'F[7]'=> 0}, 'mass_data' => @mass_data).defaultdict, 0.7]
+      [Composition.new(['F[6]' => 1], ['F[7]'=> 0], **{'mass_data' => @mass_data}), 0.7]
 
     assert_equal most_probable_isotopic_composition('formula' => 'F10', 'mass_data' => @mass_data),
-      [Composition.new({'F[6]' => 7, 'F[7]' => 3}, 'mass_data' => @mass_data), (0.3)**3 * (0.7)**7 * 120]
+      [Composition.new(*['F[6]' => 7, 'F[7]' => 3], **{'mass_data' => @mass_data}), (0.3)**3 * (0.7)**7 * 120]
     
     
     assert_equal most_probable_isotopic_composition('formula' => 'A20F10', 'elements_with_isotopes' => ['F'], 'mass_data' => @mass_data),
-        [Composition.new({'A' => 20, 'F[6]' => 7, 'F[7]' => 3}, 'mass_data' => @mass_data), (0.3)**3 * (0.7)**7 * 120]
+        [Composition.new(*['A' => 20, 'F[6]' => 7, 'F[7]' => 3], 'mass_data' => @mass_data), (0.3)**3 * (0.7)**7 * 120]
   end
 
   def test_isotopic_composition_abundance
     (1...10).to_a.each do |peplen|
-      assert_equal (isotopic_composition_abundance('formula' => 'F[6]' * peplen, 'mass_data' => @mass_data) -
-        @mass_data['F'][6][1] ** peplen).round(7).to_i, 0.0
+      assert_equal isotopic_composition_abundance('formula' => 'F[6]' * peplen, 'mass_data' => @mass_data).round(7),
+        @mass_data['F'][6][1] ** peplen.round(7)
 
-      assert_equal (isotopic_composition_abundance('formula' => 'AF[6]' * peplen, 'mass_data' => @mass_data) -
-        @mass_data['F'][6][1] ** peplen).round(7).to_i, 0.0
+      assert_equal isotopic_composition_abundance('formula' => 'AF[6]' * peplen, 'mass_data' => @mass_data).round(7),
+        @mass_data['F'][6][1] ** peplen.round(7)
 
-      assert_equal (isotopic_composition_abundance('formula' => 'A[1]F[6]' * peplen, 'mass_data' => @mass_data) -
-          (@mass_data['A'][1][1] * @mass_data['F'][6][1]) ** peplen).round(7).to_i, 0.0
+      assert_equal isotopic_composition_abundance('formula' => 'A[1]F[6]' * peplen, 'mass_data' => @mass_data).round(7),
+          ((@mass_data['A'][1][1] * @mass_data['F'][6][1]) ** peplen).round(7)
     end
   end
 
@@ -229,7 +229,7 @@ class TestMass < Minitest::Test
       {'parsed_sequence' => parse('XYF', show_unmodified_termini: true)},
       {'split_sequence' => parse('XYF', show_unmodified_termini: true, split: true)},
       {'formula' => 'ABDEF'},
-      {'composition' => Composition.new('sequence' => 'XYF', 'aa_comp' => @aa_comp).defaultdict}]
+      {'composition' => Composition.new('sequence' => 'XYF', 'aa_comp' => @aa_comp)}]
     arglist = [[peptide], [], [], [], [], []]
     arglist.zip(kwlist).each do |args, kw|
       kwargs = kw_common.dup

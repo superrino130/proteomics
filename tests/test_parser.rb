@@ -122,6 +122,9 @@ class TestMass < Minitest::Test
   end
 
   # テストがおかしい
+  # pyteomics の def test_isoforms_maxmods では
+  # modseqs が empty な為、for ms in modseqs が走らない
+  #
   # def test_isoforms_maxmods
   #   50.times do
   #     l = rand(1..10)

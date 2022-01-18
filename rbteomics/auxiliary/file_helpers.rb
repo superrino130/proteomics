@@ -14,10 +14,7 @@
 Basestring = String
 
 require 'pandas'
-pd = Pandas
-
 require 'numpy'
-np = Numpy
 
 # try:
 #     import dill
@@ -85,11 +82,11 @@ end
 
 # class _file_obj
 class File_obj
-  def initialize(f, mode, encoding=nil)
-    __init__(f, mode, encoding)
+  def initialize(...)
+    __init__(...)
   end
 
-  def __init__(f, mode, encoding=nil)
+  def __init__(f, mode, encoding: nil)
     @_file_spec = nil
     @mode = mode
     if f.nil?
