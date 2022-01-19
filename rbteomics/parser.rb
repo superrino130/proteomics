@@ -281,7 +281,7 @@ def cleave(...)
   Set.new(_cleave(...))
 end
 
-def _cleave(sequence, rule, missed_cleavages: 0, min_length: nil, semi: false, exception: nil)
+def _cleave(sequence, rule, missed_cleavages: 0, min_length: nil, semi: false, except: nil)
   if EXPASY_rules.include?(rule)
     rule = EXPASY_rules[rule]
   elsif PSIMS_rules.include?(rule)
@@ -289,7 +289,7 @@ def _cleave(sequence, rule, missed_cleavages: 0, min_length: nil, semi: false, e
   elsif PSIMS_index.include?(rule)
     rule = PSIMS_index[rule]
   end
-  exception = EXPASY_rules[exception] || exception
+  except = EXPASY_rules[except] || except
   peptides = []
   ml = missed_cleavages + 2
   trange = (0...ml)
@@ -298,24 +298,30 @@ def _cleave(sequence, rule, missed_cleavages: 0, min_length: nil, semi: false, e
     min_length = 1
   end
   cl = 1
-  if exception.nil?.!
+  if except.nil?.!
     exceptions = Set.new
     i = 0
-    while m = sequence.match(exception, i)
+    while m = sequence.match(except, i)
+      break if m.empty?
       i = m.end(0)
       exceptions << i
     end
     exceptions << nil
   end
-  a = []
-  i = 0
-  while m = sequence.match(rule, i)
-    i = m.end(0)
-    a << i
-  end
-  a << nil
+
+  @md = Struct.new(:text, :begin, :end)
+  def find_iter(rgx, text)
+    idx = 0
+    while (m = rgx.match(text, idx))
+      yield @md.new(m[0], m.begin(0), m.end(0))
+      idx = m.end(0)
+      break if m[0].empty?
+    end
+  end  
+  a = enum_for(:find_iter, rule, sequence).map(&:end) + [nil]
+
   a.each do |i|
-    next if !!exception && exceptions.include?(i)
+    next if !!except && exceptions.include?(i)
     cleavage_sites.push(i)
     cl += 1 if cl < ml
     trange.to_a[0...cl - 1].each do |j|
@@ -396,7 +402,7 @@ PSIMS_rules = {
   Cvstr.new('proline endopeptidase', accession: 'MS:1001916') => /(?<=[HKR]P)(?!P)/,
 }
 
-PSIMS_index = @cvquery.__call__(PSIMS_rules)
+PSIMS_index = Cvquery.new.__call__(PSIMS_rules)
 
 def isoforms(sequence, **kwargs)
   def main(group)

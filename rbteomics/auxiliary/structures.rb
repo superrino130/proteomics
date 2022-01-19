@@ -410,23 +410,23 @@ class Unitstr < String
 end
 
 class Cvstr < String
+  attr_accessor :accession, :unit_accession
   @@_cache = {}
-
-  def initialize(...)
-    __new__(...)
+  def initialize(value, ...)
+    super(value)
+    __new__(value, ...)
   end
 
   def __new__(value, accession: nil, unit_accession: nil)
-    begin
-      inst = cls._cache[value]
-      return inst if inst.accession == accession && inst.unit_accession == unit_accession
-    rescue => exception
-      # PASS
+    if @@_cache[value]
+      @accession = accession
+      @unit_accession = unit_accession
+      return self
     end
-    # @value = value.to_s
-    # @accession = _intern_unit_or_cv(accession)
-    # @unit_accession = _intern_unit_or_cv(unit_accession)
-    # @@_cache[value] = @value
+    @accession = _intern_unit_or_cv(accession)
+    @unit_accession = _intern_unit_or_cv(unit_accession)
+    @@_cache[value] = self
+    self
   end
 
   @property
@@ -536,4 +536,4 @@ class CVQueryEngine
   end
 end
 
-@cvquery = CVQueryEngine.new
+Cvquery = CVQueryEngine

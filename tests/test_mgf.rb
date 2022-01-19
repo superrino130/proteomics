@@ -16,6 +16,9 @@ np = Numpy
 # from collections import OrderedDict
 # from pyteomics import mgf, auxiliary as aux
 # import data
+require_relative '../rbteomics/mgf'
+require 'set'
+
 
 class MGFTest < Minitest::Test
   def setup
@@ -23,6 +26,7 @@ class MGFTest < Minitest::Test
     @_encoding = 'utf-8'
     @path = 'test.mgf'
     @header = read_header(@path)
-    
+    f = read(@path)
+    @spectra = f.to_a
   end
 end

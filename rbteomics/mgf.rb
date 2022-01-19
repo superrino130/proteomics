@@ -15,9 +15,9 @@ class MGFBase
   attr_reader :_comments
   def initialize(...)
     @_comments = Set.new('#;!/'.split(''))
-    @_array = (lambda x, dtype: np.array(x, dtype: dtype))
-    @_ma = (lambda x, dtype: np.ma.masked_equal(np.array(x, dtype: dtype), 0))
-    @_identity = lambda x, **kw: x
+    @_array = lambda { |x, dtype| Numpy.array(x, dtype: dtype) }
+    @_ma = lambda { |x, dtype| Numpy.ma.masked_equal(Numpy.array(x, dtype: dtype), 0) }
+    @_identity = lambda { |x, **kw| x }
     @_array_converters = {
         'm/z array' => [@_identity, @_array, @_array],
         'intensity array' => [@_identity, @_array, @_array],
@@ -121,7 +121,7 @@ class MGFBase
         data['charge array'] = charges if @_read_charges
         data['ion array'] = ions if @_read_ions
         data.each do |key, value|
-          out[key] = _array_converters[key][@_convert_arrays](values, dtype: @_dtype_dict[key])
+          out[key] = @_array_converters[key][@_convert_arrays](values, dtype: @_dtype_dict[key])
         end
         out
       else
@@ -143,7 +143,7 @@ class MGFBase
             if exception.instance_of?(IndexError)
               # PASS
             else
-              raise PyteomicsError.new("Error when parsing %s. Line:\n#{[getattr(@._source, 'name', 'MGF file'), line]}")
+              raise PyteomicsError.new("Error when parsing #{getattr(@_source, 'name', 'MGF file')}. Line:\n#{line}")
             end            
           end
         end
@@ -342,14 +342,14 @@ def _default_repr(key, val)
   "#{key.upcase}=#{val}"
 end
 
-Default_value_formatters = {'pepmass' => _pepmass_repr, 'charge' => _charge_repr}
+Default_value_formatters = {'pepmass' => '_pepmass_repr', 'charge' => '_charge_repr'}
 
 # @aux._file_writer()
-def write(spectra, output: nil, header: '', key_order: _default_key_order, fragment_format: nil,
-  write_charges: true, write_ions: false, use_numpy: nil, param_formatters: _default_value_formatters)
+def write(spectra, output: nil, header: '', key_order: Default_key_order, fragment_format: nil,
+  write_charges: true, write_ions: false, use_numpy: nil, param_formatters: Default_value_formatters)
 
   def key_value_line(key, val)
-    (param_formatters[key] || _default_repr)(key, val) + "\n"
+    (method(param_formatters[key]).call(key, val) || _default_repr(key, val)) + "\n"
   end
 
   @nones = [nil, Numpy.nan, Numpy.ma.masked]
@@ -432,7 +432,7 @@ def write(spectra, output: nil, header: '', key_order: _default_key_order, fragm
       end
 
       if success.!
-        z = write_charges ? spectrum['m/z array'].zip(spectrum['intensity array'], spectrum['charge array']) : (write_ions ? spectrum.['ion array'] : spectrum['ion array'])
+        z = write_charges ? spectrum['m/z array'].zip(spectrum['intensity array'], spectrum['charge array']) : write_ions ? spectrum['ion array'] : spectrum['ion array']
         z.map{ _1 << nil }.each do |m, i, c|
           if format_str == "{} {} {}\n"
             output.write("#{m} #{i} #{nones.include?(c).! ? c : ''}")

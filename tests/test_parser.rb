@@ -56,13 +56,24 @@ class TestMass < Minitest::Test
     end
   end
 
-  # def test_cleave
-  #   assert_equal xcleave('PEPTIDEKS', EXPASY_rules['trypsin']), [[0, 'PEPTIDEK'], [8, 'S']]
-  # end
+  def test_cleave
+    assert_equal _cleave('PEPTIDEKS', EXPASY_rules['trypsin']), ['PEPTIDEK', 'S']
+    assert_equal _cleave('PEPTIDEKS', 'trypsin'), ['PEPTIDEK', 'S']
+    assert_equal _cleave('PEPTIDEKS', 'Trypsin'), ['PEPTIDEK', 'S']
+    @simple_sequences.each do |seq|
+      cleave(seq, 'trypsin', missed_cleavages: rand(1...10)).each do |elem|
+        assert seq.include?(elem)
+      end
+      assert cleave(seq, EXPASY_rules['trypsin'], missed_cleavages: seq.size).select{ |elem| elem == seq }.size > 0
+    end
+  end
 
-  # def test_cleave_semi
-
-  # end
+  def test_cleave_semi
+    assert_equal _cleave('PEPTIDEKS', EXPASY_rules['trypsin'], semi: true),
+      ['PEPTIDEK', 'P', 'PE', 'PEP', 'PEPT', 'PEPTI', 'PEPTID', 'EPTIDEK', 'PTIDEK', 'TIDEK', 'IDEK', 'DEK', 'EK', 'K', 'S']
+    assert_equal cleave('PEPTIDEKS', EXPASY_rules['trypsin'], semi: true),
+      Set.new(['PEPTIDEK', 'P', 'PE', 'PEP', 'PEPT', 'PEPTI', 'PEPTID', 'EPTIDEK', 'PTIDEK', 'TIDEK', 'IDEK', 'DEK', 'EK', 'K', 'S'])
+  end
 
   # def test_cleave_min_length
 
