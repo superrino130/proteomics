@@ -317,7 +317,8 @@ def _cleave(sequence, rule, missed_cleavages: 0, min_length: nil, semi: false, e
       idx = m.end(0)
       break if m[0].empty?
     end
-  end  
+  end
+  rule = Regexp.new(rule) if rule.instance_of?(String)
   a = enum_for(:find_iter, rule, sequence).map(&:end) + [nil]
 
   a.each do |i|

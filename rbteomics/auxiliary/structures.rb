@@ -8,7 +8,7 @@
 # except NameError:
 #     basestring = (str, bytes)
 #     PY2 = False
-Basestring = String
+Basestring = String if Basestring.nil?
 PY2 = false
 
 # _UNIT_CV_INTERN_TABLE = dict()

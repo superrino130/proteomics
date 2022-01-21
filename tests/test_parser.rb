@@ -75,16 +75,21 @@ class TestMass < Minitest::Test
       Set.new(['PEPTIDEK', 'P', 'PE', 'PEP', 'PEPT', 'PEPTI', 'PEPTID', 'EPTIDEK', 'PTIDEK', 'TIDEK', 'IDEK', 'DEK', 'EK', 'K', 'S'])
   end
 
-  # def test_cleave_min_length
+  def test_cleave_min_length
+    @simple_sequences.each do |seq|
+      ml = rand(1.0...5.0)
+      cleave(seq, EXPASY_rules['trypsin'], missed_cleavages: rand(1...10), min_length: ml).each do |elem|
+        assert elem.size >= ml
+      end
+    end
+  end
 
-  # end
-
-  # def test_num_sites
-  #   assert_equal num_sites('RKCDE', 'K'), 1
-  #   assert_equal num_sites('RKCDE', 'E'), 0
-  #   assert_equal num_sites('RKCDE', 'R'), 1
-  #   assert_equal num_sites('RKCDE', 'Z'), 0
-  # end
+  def test_num_sites
+    assert_equal num_sites('RKCDE', 'K'), 1
+    assert_equal num_sites('RKCDE', 'E'), 0
+    assert_equal num_sites('RKCDE', 'R'), 1
+    assert_equal num_sites('RKCDE', 'Z'), 0
+  end
 
   def test_isoforms_simple
     assert_equal(
