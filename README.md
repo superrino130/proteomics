@@ -1,5 +1,5 @@
 # proteomics
-[Pyteomics](https://pyteomics.readthedocs.io/en/latest/) の `Ruby` 版を目指します。
+[Pyteomics](https://pyteomics.readthedocs.io/en/latest/) ***v4.5*** の `Ruby` 版を目指します。
 （仮リポジトリ）
 
 from python 3.7 to ruby 2.7
@@ -71,3 +71,7 @@ plt.show()
 ```
 を経て、グラフが表示されます。
 ![example1実行結果](./example1.png)
+
+# テスト進捗（完了）
++ test_electrochem.rb
++ test_parser.rb

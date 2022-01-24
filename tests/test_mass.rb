@@ -43,7 +43,7 @@ class TestMass < Minitest::Test
         }
 
     @ion_comp = {
-      # 'M' => Composition.new({}, 'mass_data' => @mass_data),
+      'M' => Composition.new({}, 'mass_data' => @mass_data),
       'a' => Composition.new({'A' => -1}, 'mass_data' => @mass_data)
     }
 
@@ -164,10 +164,10 @@ class TestMass < Minitest::Test
   def test_isotopic_composition_abundance
     (1...10).to_a.each do |peplen|
       assert_equal isotopic_composition_abundance('formula' => 'F[6]' * peplen, 'mass_data' => @mass_data).round(7),
-        @mass_data['F'][6][1] ** peplen.round(7)
+        (@mass_data['F'][6][1] ** peplen).round(7)
 
       assert_equal isotopic_composition_abundance('formula' => 'AF[6]' * peplen, 'mass_data' => @mass_data).round(7),
-        @mass_data['F'][6][1] ** peplen.round(7)
+        (@mass_data['F'][6][1] ** peplen).round(7)
 
       assert_equal isotopic_composition_abundance('formula' => 'A[1]F[6]' * peplen, 'mass_data' => @mass_data).round(7),
           ((@mass_data['A'][1][1] * @mass_data['F'][6][1]) ** peplen).round(7)
@@ -234,8 +234,8 @@ class TestMass < Minitest::Test
     arglist.zip(kwlist).each do |args, kw|
       kwargs = kw_common.dup
       kwargs.merge(kw)
-      isotopologues = isotopologues(*args, **kwargs)
-      isotopologues.each do |state|
+      _isotopologues = isotopologues(*args, **kwargs)
+      _isotopologues.each do |state|
         i = states.index(state)
         assert i != -1
         assert_equal abundances[i].round(7), isotopic_composition_abundance(state,

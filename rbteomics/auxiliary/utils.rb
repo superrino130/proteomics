@@ -11,7 +11,7 @@ require 'zlib'
 #     basestring
 # except NameError:
 #     basestring = (str, bytes)
-BaseString = String
+BaseString ||= String
 
 # try:
 #     import numpy as np

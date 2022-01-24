@@ -167,7 +167,11 @@ def fast_valid(sequence, labels: Set.new(STD_labels))
 end
 
 def tostring(parsed_sequence, show_unmodified_termini: true)
-  parsed_sequence = parsed_sequence.to_a
+  if parsed_sequence.is_a?(Hash)
+    parsed_sequence = parsed_sequence.keys
+  elsif parsed_sequence.is_a?(String)
+    parsed_sequence = parsed_sequence.split('')
+  end
   labels = []
   nterm = parsed_sequence[0]
   cterm = parsed_sequence[-1]

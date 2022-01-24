@@ -2,7 +2,7 @@ require 'minitest/autorun'
 require_relative '../rbteomics/parser'
 require 'set'
 
-class TestMass < Minitest::Test
+class TestParser < Minitest::Test
   def setup
     @simple_sequences = 10.times.map{ rand(1..20).times.map{ ('A'..'Z').to_a.sample }.join('') }
     @labels = ['A', 'B', 'C', 'N', 'X']

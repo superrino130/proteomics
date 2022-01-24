@@ -41,7 +41,7 @@ end
 
 def _parse_isotope_string(label)
   m = ISOTOPE_string.match(label)
-  element_name, num = m[0], m[2]
+  element_name, num = m[1], m[2]
   isotope_num = ['', 0, nil, false, [], {}].include?(num).! ? num.to_i : 0
   [element_name, isotope_num]
 end
@@ -140,12 +140,12 @@ class Composition < BasicComposition
     kw_given = @_kw_sources & kwargs.keys
     if kw_given.size > 1
       raise PyteomicsError.new("Only one of #{@_kw_sources.join(', ')} can be specified!\nGiven: #{kw_given.join(', ')}")
-    elsif ['', 0, nil, false].include?(kw_given).! && kw_given.empty?.!
+    elsif kw_given.empty?.!
       kwa = kw_given.first
       kw_given.delete(kwa)
       method(('_from_' + kwa).to_sym).call(kwargs[kwa], kwa == 'formula' ? mass_data : aa_comp)
-    elsif ['', 0, nil, false].include?(args[0]).! && args[0].empty?.!
-      if args[0].instance_of?(Hash)
+    elsif ['', 0, nil, false, [], {}].include?(args).!
+      if args[0].is_a?(Hash)
           _from_composition(args[0])
       elsif args[0].instance_of?(String)
         begin
@@ -169,14 +169,14 @@ class Composition < BasicComposition
     end
 
     ion_comp = kwargs['ion_comp'] || STD_ion_comp
-    if ['', 0, nil, false, [], {}].include?(kwargs['ion_type']).!
+    if kwargs.include?('ion_type')
       ion_comp[kwargs['ion_type']].each do |k, v|
         self[k] = v
       end
     end
 
     charge = self['H+']
-    if ['', 0, nil, false, [], {}].include?(kwargs['charge']).!
+    if kwargs.include?('charge')
       if ['', 0, nil, false, [], {}].include?(charge).!
         raise PyteomicsError.new("Charge is specified both by the number of protons and 'charge' in kwargs")
       end
@@ -277,7 +277,7 @@ def calculate_mass(*args, **kwargs)
 end
 
 def most_probable_isotopic_composition(*args, **kwargs)
-  composition = kwargs.include?('composition') ? Composition.new(kwargs['composition']) : Composition.new(*args, **kwargs)
+  composition = kwargs.include?('composition') ? kwargs['composition'].to_h : Composition.new(*args, **kwargs)
 
   composition.each do |isotope_string, _|
     element_name, isotope_num = _parse_isotope_string(isotope_string)
@@ -306,14 +306,11 @@ def most_probable_isotopic_composition(*args, **kwargs)
       isotopic_composition[element_name] = composition[element_name]
     end
   end
-  # [isotopic_composition, isotopic_composition_abundance(isotopic_composition, mass_data)]
-  a = isotopic_composition
-  b = isotopic_composition_abundance(isotopic_composition, mass_data)
-  [a, b]
+  [isotopic_composition, isotopic_composition_abundance('composition' => isotopic_composition, 'mass_data' => mass_data)]
 end
 
 def isotopic_composition_abundance(*args, **kwargs)
-  composition = kwargs['composition'] ? Composition.new(kwargs['composition']) : Composition.new(*args, **kwargs)
+  composition = kwargs.include?('composition') ? Composition.new(kwargs['composition']) : Composition.new(*args, **kwargs)
 
   isotopic_composition = Hash.new{ |h, k| h[k] = {} }
 
@@ -340,53 +337,56 @@ end
 
 # Fiber
 def isotopologues(*args, **kwargs)
-  iso_threshold = kwargs.delete('isotope_threshold') || 5e-4
-  overall_threshold = kwargs.delete('overall_threshold') || 0.0
-  mass_data = kwargs['mass_data'] || NIST_mass
-  elements_with_isotopes = kwargs['elements_with_isotopes']
-  report_abundance = kwargs['report_abundance'] || false
-  composition = kwargs['composition'] ? Composition.new(kwargs['composition']) : Composition.new(*args, **kwargs)
-  other_kw = kwargs.dup
-  Composition.new._kw_sources.each do |k|
-    other_kw.delete(k)
-  end
-  dict_elem_isotopes = {}
-  composition.each do |element, _|
-    if elements_with_isotopes.nil? || elements_with_isotopes.include?(element)
-      element_name, isotope_num = _parse_isotope_string(element)
-      isotopes = mass_data[element_name].select{ |k, v| k != 0 && v[1] >= iso_threshold }
-      list_isotopes = isotopes.map{ |k, v| _make_isotope_string(element_name, k) }
-      dict_elem_isotopes[element] = list_isotopes
-    else
-      dict_elem_isotopes[element] = [element]
+  # Fiber.new do
+    iso_threshold = kwargs.delete('isotope_threshold') || 5e-4
+    overall_threshold = kwargs.delete('overall_threshold') || 0.0
+    mass_data = kwargs['mass_data'] || NIST_mass
+    elements_with_isotopes = kwargs['elements_with_isotopes']
+    report_abundance = kwargs['report_abundance'] || false
+    composition = kwargs.include?('composition') ? Composition.new(kwargs['composition']) : Composition.new(*args, **kwargs)
+    other_kw = kwargs.dup
+    Composition.new._kw_sources.each do |k|
+      other_kw.delete(k)
     end
-  end
-  all_isotoplogues = []
-  dict_elem_isotopes.each do |element, list_isotopes|
-    n = composition[element]
-    list_comb_element_n = []
-    list_isotopes.repeated_combination(n).each do |elementXn|
-      list_comb_element_n. << elementXn
-    end
-    all_isotoplogues << list_comb_element_n
-  end
-  all_isotoplogues[0].product(*all_isotoplogues[1..-1]).each do |isotopologue|
-    ic = Composition.new(isotopologue.flatten.join(''), **other_kw)
-    if report_abundance || overall_threshold > 0.0
-      abundance = isotopic_composition_abundance(composition: ic, **other_kw)
-      if abundance > overall_threshold
-        if report_abundance
-          [ic, abundance]
-          Fiber.yield
-        else
-          ic
-          Fiber.yield
-        end
+    dict_elem_isotopes = {}
+    composition.each do |element, _|
+      if elements_with_isotopes.nil? || elements_with_isotopes.include?(element)
+        element_name, isotope_num = _parse_isotope_string(element)
+        isotopes = mass_data[element_name].select{ |k, v| k != 0 && v[1] >= iso_threshold }
+        list_isotopes = isotopes.map{ |k, v| _make_isotope_string(element_name, k) }
+        dict_elem_isotopes[element] = list_isotopes
+      else
+        dict_elem_isotopes[element] = [element]
       end
-    else
-      Fiber.yield
     end
-  end
+    all_isotoplogues = []
+    dict_elem_isotopes.each do |element, list_isotopes|
+      n = composition[element]
+      list_comb_element_n = []
+      list_isotopes.repeated_combination(n).each do |elementXn|
+        list_comb_element_n. << elementXn
+      end
+      all_isotoplogues << list_comb_element_n
+    end
+    all_isotoplogues[0].product(*all_isotoplogues[1..-1]).each do |isotopologue|
+      ic = Composition.new(isotopologue.flatten.join(''), **other_kw)
+      if report_abundance || overall_threshold > 0.0
+        abundance = isotopic_composition_abundance(composition: ic, **other_kw)
+        if abundance > overall_threshold
+          if report_abundance
+            # Fiber.yield [ic, abundance]
+            yield [ic, abundance]
+          else
+            # Fiber.yield ic
+            yield ic
+          end
+        end
+      else
+        # Fiber.yield ic
+        yield ic
+      end
+    end
+  # end
 end
 
 STD_aa_mass = {

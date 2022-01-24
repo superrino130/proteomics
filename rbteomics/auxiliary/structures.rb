@@ -8,11 +8,11 @@
 # except NameError:
 #     basestring = (str, bytes)
 #     PY2 = False
-Basestring = String if Basestring.nil?
-PY2 = false
+BaseString ||= String
+PY2 ||= false
 
 # _UNIT_CV_INTERN_TABLE = dict()
-UNIT_CV_INTERN_TABLE = {}
+UNIT_CV_INTERN_TABLE ||= {}
 
 def clear_unit_cv_table()
   UNIT_CV_INTERN_TABLE.clear
@@ -270,15 +270,15 @@ class BasicComposition < Hash
       raise PyteomicsError.new("Only integers allowed as values in Composition, got #{value.class}.")
     end
     if value != 0 # reject 0's
-      self[key] = value
+      self.merge!({key => value})
     elsif self.include?(key)
       self.delete(key)
     end
   end
 
-  # def [](...)
-  #   __setitem__(...)
-  # end
+  def []=(...)
+    __setitem__(...)
+  end
 
   def copy()
     @defaultdict.class.concat(@defaultdict)
@@ -536,4 +536,4 @@ class CVQueryEngine
   end
 end
 
-Cvquery = CVQueryEngine
+Cvquery ||= CVQueryEngine

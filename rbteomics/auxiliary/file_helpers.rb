@@ -11,7 +11,7 @@
 # import os
 # from abc import ABCMeta
 
-Basestring = String
+BaseString ||= String
 
 require 'pandas'
 require 'numpy'
@@ -49,11 +49,11 @@ def _keepstate(func)
   def wrapped(*args, **kwargs)
     positions = [args.map{ (_1.respond_to?(:seek) ? (_1.seek && (_1.respond_to?(:tell) ? _1.arg : nill.class)) : nil) }]
     args.zip(positions).each do |arg, pos|
-      arg.seek(0) if !!pos
+      arg.seek(0) if pos.nil?.!
     end
     res = func(*args, **kwargs)
     args.zip(positions).each do |arg, pos|
-      if !!pos
+      if pos.nil?.!
         begin
           arg.seek(pos)
         rescue => exception
@@ -90,9 +90,9 @@ class File_obj
     @_file_spec = nil
     @mode = mode
     if f.nil?
-      @file = {r: 'gets', a: 'puts', w: 'warn'}[mode[0]]
+      @file = {'r' => 'gets', 'a' => 'puts', 'w' => 'warn'}[mode[0]]
       @_file_spec = nil
-    elsif f.instance_of?(Basestring)
+    elsif f.instance_of?(BaseString)
       @file = File.open(f, mode)
       @file.set_encoding(encoding) if encoding.nil?.!
       @_file_spec = f
@@ -121,7 +121,7 @@ class File_obj
       return exit(*args, **kwargs)
     else
       exit = @file.respond_to?(:close) ? @file.close : nil
-      exit() if !!exit
+      exit() if exit.nil?.!
     end
   end
 
@@ -142,8 +142,8 @@ end
 
 class IteratorContextManager
   include NoOpBaseReader
-  def initialize(*args, **kwargs)
-    __init__(args, kwargs)
+  def initialize(...)
+    __init__(...)
   end
 
   def __init__(*args, **kwargs)
@@ -204,7 +204,7 @@ class FileReader < IteratorContextManager
     func = kwargs['parser_func']
     # super(*kwargs[:args], parser_func: func, **kwargs[:kwargs])
     # super(*kwargs[:args], parser_func: func, **kwargs[:kwargs])
-    super(kwargs[:args], parser_func: func, **kwargs[:kwargs])
+    super(kwargs[:args], 'parser_func' => func, **kwargs[:kwargs])
     @_pass_file = kwargs['pass_file']
     @_source_init = source
     @_mode = kwargs['mode']
@@ -248,26 +248,26 @@ end
 module IndexedReaderMixin
   include NoOpBaseReader
 
-  attr_reader :offset_index
+  attr_reader :_offset_index
   
   def index
-    @offset_index
+    @_offset_index
   end
 
   def default_index
-    @offset_index
+    @_offset_index
   end
 
   def __len__
-    @offset_index.size
+    @_offset_index.size
   end
 
   def __contaions__(key)
-    @offset_index.include?(key)
+    @_offset_index.include?(key)
   end
 
   def _item_form_offsets(other)
-    raise NotImplementedError
+    raise NotImplementedError.new
   end
 
   def get_py_id(elem_id)
@@ -314,17 +314,17 @@ module IndexedReaderMixin
   end
 
   def __getitem__(key)
-    return get_by_id(key) if key.instance_of?(Basestring)
+    return get_by_id(key) if key.instance_of?(BaseString)
     return get_by_index(key) if key.instance_of?(Integer)
     if key.instance_of?(Sequence)
       return [] if key.!
       return get_by_indexes(key) if key[0].instance_of?(Integer)
-      return get_by_ids(key) if key[0].instance_of?(Basestring)
+      return get_by_ids(key) if key[0].instance_of?(BaseString)
     end
     # if isinstance(key, slice):
     if key.instance_of?(Array)
       return get_by_index_slice(key) if key[0].instance_of?(Integer)
-      return get_by_key_slice(key) if key[0].instance_of?(Basestring)
+      return get_by_key_slice(key) if key[0].instance_of?(BaseString)
       return self if key.nil?
     end
     raise PyteomicsError.new("Unsupported query key: #{key}")
@@ -332,8 +332,8 @@ module IndexedReaderMixin
 end
 
 class RTLocator
-  def initialize(reader)
-    __init__(reader)
+  def initialize(...)
+    __init__(...)
   end
 
   def __init__(reader)
@@ -342,7 +342,7 @@ class RTLocator
 
   def _get_scan_by_time(time)
     if @_reader.default_index.!
-      raise .new("This method requires the index. Please pass `use_index=True` during initialization")
+      raise PyteomicsError.new("This method requires the index. Please pass `use_index=True` during initialization")
     end
 
     scan_ids = [@_reader.default_index]
@@ -387,6 +387,16 @@ class RTLocator
     return _get_scan_by_time(key)[1] if [Integer, Float].include?(key.class)
     return key.map{ _get_scan_by_time(t)[1] } if key.instance_of?(Sequence)
     # if isinstance(key, slice):
+    if key.start.nil?
+      start_index = @_reader.default_index.from_index(0)
+    else
+      start_index = _get_scan_by_time(key.start)[0]
+    end
+    if key.stop.nil?
+      stop_index = @_reader.default_index.from_index(-1)
+    else
+      stop_index = _get_scan_by_time(key.stop)[0]
+    end
     raise "there is no slice class"
   end
 end
@@ -394,36 +404,39 @@ end
 class TimeOrderedIndexedReaderMixin
   include IndexedReaderMixin
 
-  def time()
+  #@property
+  def time
       @_time
   end
 
-  def initialize(*args, **kwargs)
-    __init__(args, kwargs)
+  def initialize(...)
+    __init__(...)
   end
 
   def __init__(*args, **kwargs)
     super
+    @_time = RTLocator.new
   end
 
   #staticmethod
-  def _get_time(scan)
-    raise NotImplementedError
+  def self._get_time(scan)
+    raise NotImplementedError.new
   end
 end
 
 class IndexedTextReader < FileReader
   include IndexedReaderMixin
 
-  def initialize(source, **kwargs)
+  def initialize(...)
     @delimiter = nil
     @label = nil
     @block_size = 1000000
     @label_group = 1
-    __init__(source, kwargs)
+    __init__(...)
   end
 
   def __init__(source, **kwargs)
+    encoding = kwargs.delete('encoding') || 'utf-8'
     super(source, mode: 'rb', encoding: nil, **kwargs)
     @encoding = encoding
     ['delimiter', 'label', 'block_size', 'label_group'].each do |attr|
@@ -460,11 +473,11 @@ class IndexedTextReader < FileReader
         match = pattern.search(chunk)
         if match
           label = match[@label_group]
-          yield [i, label.decode(@encoding), match]
+          Fiber.yield [i, label.decode(@encoding), match]
         end
         i += chunk.size
       end
-      yield [i, nil, nil]
+      Fiber.yield [i, nil, nil]
     end
   end
 
@@ -474,7 +487,7 @@ class IndexedTextReader < FileReader
     last_offset = 0
     last_label = nil
     g.each do |offset, label, keyline|
-      if !!last_label
+      if last_label.nil?.!
         index[last_label] = [last_offset, offset]
       end
       last_label = label
@@ -485,10 +498,20 @@ class IndexedTextReader < FileReader
   end
 
   def _read_lines_from_offsets(start, _end)
-    _source.seek(start)
-    lines = _source.read(_end - start).decode(@encoding).split('\n')
+    @_source.seek(start)
+    lines = @_source.read(_end - start).decode(@encoding).split('\n')
     lines
   end
+end
+
+module WritableIndex
+
+end
+
+# class OffsetIndex < OrderedDict
+class OffsetIndex < Hash
+  include WritableIndex
+
 end
 
 module IndexSavingMixin
@@ -548,14 +571,48 @@ def _file_reader(_mode: 'r')
     # @wraps(_func)
     def helper(*args, **kwargs)
       if args
-        return FileReader(args[0], mode: _mode, parser_func: _func, pass_file: true, args: args[1..-1], kwargs: kwargs,
+        return FileReader.new(args[0], mode: _mode, parser_func: _func, pass_file: true, args: args[1..-1], kwargs: kwargs,
           encoding: kwargs.delete('encoding') || nil)
       end
       source = kwargs.delete('source') || nil
-      FileReader(source, mode: _mode, parser_func: _func, pass_file: true, args: [], kwargs: kwargs, encoding: kwargs.delete('encoding') || nil)
+      FileReader.new(source, mode: _mode, parser_func: _func, pass_file: true, args: [], kwargs: kwargs, encoding: kwargs.delete('encoding') || nil)
     end
     helper
   end
   decorator
 end
 
+class IndexSavingTextReader < IndexedTextReader
+  prepend IndexSavingMixin
+end
+
+def _file_writer(_mode: 'a')
+  def docerator(_func)
+
+  end
+
+end
+
+def _make_chain(reader, readername, full_output: false)
+  def concat_results(*args, **kwargs)
+    results = args.map{ |arg| reader(arg, **kwargs) }
+    if args.map{ |a| a.instance_of?(Pandas.DataFrame)}.all?
+      return Pandas.concat(results)
+    end
+    return Numpy.concatenate(results)
+  end
+
+  def _iter(files, kwargs)
+    files.each do |f|
+      File.open(f) do |r|
+        r.each do |item|
+          yield item
+        end
+      end
+    end
+  end
+
+  def chain(*files, **kwargs)
+    _iter(files, kwargs)
+  end
+end
