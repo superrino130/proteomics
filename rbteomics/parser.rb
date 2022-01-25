@@ -25,10 +25,15 @@ end
 def match_modX(label)
   _modX_single = /^([^A-Z-]*)([A-Z])$/
   _modX_single.match(label)
+
+  m = _modX_single.match(label)
+  mod = m[1]
+  x = m[0].sub(mod,'')
+  [mod, x]
 end
 
 def is_modX(label)
-  match_modX(label).nil?.!
+  match_modX(label)[0].nil?.!
 end
 
 def length(sequence, **kwargs)
@@ -72,11 +77,11 @@ end
 def parse(sequence, show_unmodified_termini: false, split: false, allow_unknown_modifications: false, **kwargs)
   sequence = sequence.to_s
   return if sequence.empty?
-  _modX_sequence = /^([^-]+-)?((?:[^A-Z-]*[A-Z])+)(-[^-]+)?$/
+  _modX_sequence = Regexp.compile('^([^-]+-)?((?:[^A-Z-]*[A-Z])+)(-[^-]+)?$')
 
   begin
     m = _modX_sequence.match(sequence)
-    n, body, c = m[1], m[2], m[3]
+    n, body, c = m[1], m[2], m[3] if m.nil?.!
   rescue => exception
     raise PyteomicsError.new('Not a valid modX sequence: ' + sequence)
   end
@@ -91,8 +96,8 @@ def parse(sequence, show_unmodified_termini: false, split: false, allow_unknown_
     end
   end
   
-  _modX_split = /([^A-Z-]*)([A-Z])/
-  _modX_group = /[^A-Z-]*[A-Z]/
+  _modX_split = Regexp.compile('([^A-Z-]*)([A-Z])')
+  _modX_group = Regexp.compile('[^A-Z-]*[A-Z]')
   if split
     parsed_sequence = body.scan(_modX_split).map{ ['', 0, nil, false, [], {}].include?(_1[0]).! ? _1 : [_1[1]] }
   else
@@ -108,7 +113,7 @@ def parse(sequence, show_unmodified_termini: false, split: false, allow_unknown_
       labels = Set.new(labels)
     end
     [n, c].zip([STD_nterm, STD_cterm]).each do |term, std_term|
-      if ['', nil, 0, [], {}].include?(term).! && labels.include?(term).! && allow_unknown_modifications.!
+      if ['', 0, nil, false, [], {}].include?(term).! && labels.include?(term).! && allow_unknown_modifications.!
         return PyteomicsError.new("Unknown label: #{term}")
       end
     end

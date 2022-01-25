@@ -147,7 +147,7 @@ class Composition < BasicComposition
     elsif ['', 0, nil, false, [], {}].include?(args).!
       if args[0].is_a?(Hash)
           _from_composition(args[0])
-      elsif args[0].instance_of?(String)
+      elsif args[0].is_a?(String)
         begin
           _from_sequence(args[0], aa_comp)
         rescue => exception
@@ -326,9 +326,9 @@ def isotopic_composition_abundance(*args, **kwargs)
   mass_data = kwargs['mass_data'] || NIST_mass
   num1, num2, denom = 1, 1, 1
   isotopic_composition.each do |element_name, isotope_dict|
-    num1 *= isotope_dict.values.sum.to_r
+    num1 *= (1..isotope_dict.values.sum).inject(1, :*)
     isotope_dict.each do |isotope_num, isotope_content|
-      denom *= isotope_content.to_r
+      denom *= (1..isotope_content).inject(1, :*)
       num2 *= mass_data[element_name][isotope_num][1] ** isotope_content if isotope_num != 0
     end
   end
@@ -371,7 +371,7 @@ def isotopologues(*args, **kwargs)
     all_isotoplogues[0].product(*all_isotoplogues[1..-1]).each do |isotopologue|
       ic = Composition.new(isotopologue.flatten.join(''), **other_kw)
       if report_abundance || overall_threshold > 0.0
-        abundance = isotopic_composition_abundance(composition: ic, **other_kw)
+        abundance = isotopic_composition_abundance('composition' => ic, **other_kw)
         if abundance > overall_threshold
           if report_abundance
             # Fiber.yield [ic, abundance]

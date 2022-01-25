@@ -72,6 +72,7 @@ plt.show()
 を経て、グラフが表示されます。
 ![example1実行結果](./example1.png)
 
-# テスト進捗（完了）
+# テスト進捗（完了他）
 + test_electrochem.rb
 + test_parser.rb
++ test_mass.rb(残り2)

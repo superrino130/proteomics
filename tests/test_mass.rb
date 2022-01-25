@@ -78,6 +78,11 @@ class TestMass < Minitest::Test
   end
 
   def test_Composition_pseq
+    assert_equal Composition.new('parsed_sequence' => ['X', 'Y', 'Z'], 'aa_comp' => @aa_comp),
+      {'A' => 1, 'B' => 1, 'C' => 1}
+  end
+
+  def test_Composition_sseq
     assert_equal Composition.new('split_sequence' => [['X'], ['Y'], ['Z']], 'aa_comp' => @aa_comp),
       {'A' => 1, 'B' => 1, 'C' => 1}
   end
@@ -93,7 +98,8 @@ class TestMass < Minitest::Test
   end
 
   def test_Composition_mul
-    # Integer * Hash は未定義
+    # assert_equal 2 * Composition.new('sequence' => 'XYZ', 'aa_comp' => @aa_comp),
+    #   {'A' => 2, 'B' => 2, 'C' => 2, 'D' => 2, 'E' => 2}
     assert_equal Composition.new('sequence' => 'XYZ', 'aa_comp' => @aa_comp) * 2,
       {'A' => 2, 'B' => 2, 'C' => 2, 'D' => 2, 'E' => 2}
   end
@@ -112,10 +118,21 @@ class TestMass < Minitest::Test
                             'aa_comp' => @aa_comp,
                             'mass_data' => @mass_data),
       'ABCDE'.split('').map{ @mass_data[_1][0][0] }.sum
+    
     assert_equal calculate_mass('parsed_sequence' => ['H-', 'X', 'Y', 'Z', '-OH'],
        'aa_comp' => @aa_comp,
        'mass_data' => @mass_data),
        'ABCDE'.split('').map{ @mass_data[_1][0][0] }.sum
+
+    sum = 0
+    'ABCDE'.split('').each do |atom|
+       @mass_data[atom].each do |isotope, _|
+        if isotope != 0
+          sum += @mass_data[atom][isotope][0] * @mass_data[atom][isotope][1]
+        end
+      end
+    end
+    assert_equal calculate_mass('formula' =>'ABCDE', 'average' => true, 'mass_data' => @mass_data), sum
 
     a = []
     'ABCDE'.split('').each do |x|
@@ -128,16 +145,16 @@ class TestMass < Minitest::Test
       'mass_data' => @mass_data),
       a.sum
     
-      [1, 2, 3].each do |charge|
-        assert_equal calculate_mass('formula' => 'ABCDE', 'ion_type' => 'M', 'charge' => charge, 'mass_data' => @mass_data),
-          calculate_mass('formula' => 'ABCDE' + "H+#{charge}", 'mass_data' => @mass_data)
+    [1, 2, 3].each do |charge|
+      assert_equal calculate_mass('formula' => 'ABCDE', 'ion_type' => 'M', 'charge' => charge, 'mass_data' => @mass_data),
+        calculate_mass('formula' => 'ABCDE' + "H+#{charge}", 'mass_data' => @mass_data)
       
-        assert_equal calculate_mass('formula' => 'ABCDE', 'ion_type' => 'M', 'charge' => charge, 'mass_data' => @mass_data),
-          (calculate_mass('formula' => 'ABCDE', 'mass_data' => @mass_data) + @mass_data['H+'][0][0] * charge) / charge
+      assert_equal calculate_mass('formula' => 'ABCDE', 'ion_type' => 'M', 'charge' => charge, 'mass_data' => @mass_data),
+        (calculate_mass('formula' => 'ABCDE', 'mass_data' => @mass_data) + @mass_data['H+'][0][0] * charge) / charge
 
-        e = assert_raises PyteomicsError do
-          calculate_mass('formula' => "ABCDEH+#{charge}",
-            'ion_type' => 'M', 'charge' => charge, 'mass_data' => @mass_data)
+      e = assert_raises PyteomicsError do
+        calculate_mass('formula' => "ABCDEH+#{charge}",
+          'ion_type' => 'M', 'charge' => charge, 'mass_data' => @mass_data)
         assert e.message.include?("Charge is specified both by the number of protons and 'charge' in kwargs")
       end
     end
@@ -151,14 +168,13 @@ class TestMass < Minitest::Test
 
   def test_most_probable_isotopic_composition
     assert_equal most_probable_isotopic_composition('formula' => 'F', 'mass_data' => @mass_data),
-      [Composition.new(['F[6]' => 1], ['F[7]'=> 0], **{'mass_data' => @mass_data}), 0.7]
+      [Composition.new({'F[6]' => 1, 'F[7]'=> 0}, 'mass_data' => @mass_data), 0.7]
 
     assert_equal most_probable_isotopic_composition('formula' => 'F10', 'mass_data' => @mass_data),
-      [Composition.new(*['F[6]' => 7, 'F[7]' => 3], **{'mass_data' => @mass_data}), (0.3)**3 * (0.7)**7 * 120]
-    
+      [Composition.new({'F[6]' => 7, 'F[7]' => 3}, 'mass_data' => @mass_data), (0.3)**3 * (0.7)**7 * 120]
     
     assert_equal most_probable_isotopic_composition('formula' => 'A20F10', 'elements_with_isotopes' => ['F'], 'mass_data' => @mass_data),
-        [Composition.new(*['A' => 20, 'F[6]' => 7, 'F[7]' => 3], 'mass_data' => @mass_data), (0.3)**3 * (0.7)**7 * 120]
+        [Composition.new({'A' => 20, 'F[6]' => 7, 'F[7]' => 3}, 'mass_data' => @mass_data), (0.3)**3 * (0.7)**7 * 120]
   end
 
   def test_isotopic_composition_abundance
@@ -182,7 +198,7 @@ class TestMass < Minitest::Test
   # end
 
   def test_Unimod_methods
-
+    # Not started
   end
 
   def test_nist_mass
@@ -220,7 +236,7 @@ class TestMass < Minitest::Test
 
   def test_isotopologues
     peptide = 'XYF'
-    states = [{'F[6]': 1, 'A': 1, 'B': 1, 'D': 1, 'E': 1}, {'F[7]': 1, 'A': 1, 'B': 1, 'D': 1, 'E': 1}]
+    states = [{'F[6]' => 1, 'A' => 1, 'B' => 1, 'D' => 1, 'E' => 1}, {'F[7]' => 1, 'A' => 1, 'B' => 1, 'D' => 1, 'E' => 1}]
     abundances = [0.7, 0.3]
     kw_common = {'elements_with_isotopes' => 'F', 'aa_comp' => @aa_comp, 'mass_data' => @mass_data}
     kwlist = [
@@ -233,9 +249,8 @@ class TestMass < Minitest::Test
     arglist = [[peptide], [], [], [], [], []]
     arglist.zip(kwlist).each do |args, kw|
       kwargs = kw_common.dup
-      kwargs.merge(kw)
-      _isotopologues = isotopologues(*args, **kwargs)
-      _isotopologues.each do |state|
+      kwargs.merge!(kw)
+      isotopologues(*args, **kwargs) do |state|
         i = states.index(state)
         assert i != -1
         assert_equal abundances[i].round(7), isotopic_composition_abundance(state,
@@ -246,10 +261,10 @@ class TestMass < Minitest::Test
 
   def test_isotopologues_with_abundances
     peptide = 'XYF'
-    states = [{'F[6]': 1, 'A': 1, 'B': 1, 'D': 1, 'E': 1}, {'F[7]': 1, 'A': 1, 'B': 1, 'D': 1, 'E': 1}]
+    states = [{'F[6]' => 1, 'A' => 1, 'B' => 1, 'D' => 1, 'E' => 1}, {'F[7]' => 1, 'A' => 1, 'B' => 1, 'D' => 1, 'E' => 1}]
     abundances = [0.7, 0.3]
     isotopologues(peptide, 'elements_with_isotopes' => 'F',
-      'aa_comp' => @aa_comp, 'mass_data' => @mass_data, 'report_abundance' => true).each do |state, abundance|
+      'aa_comp' => @aa_comp, 'mass_data' => @mass_data, 'report_abundance' => true) do |state, abundance|
       i = states.index(state)
       assert i != -1
       assert_equal abundances[i].round(7), abundance.round(7)
