@@ -344,17 +344,16 @@ end
 
 class UnitFloat < Float
   def initialize(...)
-    @__slots__ = ['unit_info', nil]
     __new__(...)
   end
 
-  def __new(value, unit_info)
-    # @inst = __new__
+  def __new__(value, unit_info: nil)
+    @value = value.to_f
     @unit_info = unit_info
-    [@inst, @unit_info]
+    return self
   end
 
-  @property
+  #@property
   def __dict__
     _MappingOverAttributeProxy(self)
   end

@@ -504,16 +504,6 @@ class IndexedTextReader < FileReader
   end
 end
 
-module WritableIndex
-
-end
-
-# class OffsetIndex < OrderedDict
-class OffsetIndex < Hash
-  include WritableIndex
-
-end
-
 module IndexSavingMixin
   include NoOpBaseReader
   _index_class = NotImplementedError
@@ -582,15 +572,140 @@ def _file_reader(_mode: 'r')
   decorator
 end
 
-class IndexSavingTextReader < IndexedTextReader
-  prepend IndexSavingMixin
-end
-
 def _file_writer(_mode: 'a')
   def docerator(_func)
 
   end
 
+end
+
+module WritableIndex
+  # Not started
+end
+
+# class OffsetIndex < OrderedDict
+class OffsetIndex < Hash
+  include WritableIndex
+
+end
+
+class IndexSavingTextReader < IndexedTextReader
+  prepend IndexSavingMixin
+end
+
+class HierarchicalOffsetIndex
+  include WritableIndex
+
+  def initialize(...)
+    @_inner_type = OffsetIndex
+    __init__(...)
+  end
+
+  def __init__(base: nil)
+    @mapping = Hash.new #(self._inner_type)
+    (base || {}).each do |key, value|
+      @mapping[key] = @_inner_type.new(value)
+    end
+  end
+
+  def _integrity_check
+    self.each do |key, value|
+      if value._integrity_check().!
+        return false
+      end
+    end
+    true
+  end
+
+  def sort
+    self.each do |key, value|
+      value.sort!
+    end
+  end
+
+  def __getitem__(key)
+    @mapping[key]
+  end
+
+  def __setitem__(key, value)
+    @mapping[key] = value
+  end
+
+  def __iter__
+    @mapping.to_enum
+  end
+
+  def __len__
+    self.sum{ |key, group| group.size }
+  end
+
+  def __contains__(key)
+    @mapping.include?(key)
+  end
+
+  def find(key, element_type: nil)
+    if element_type.nil?
+      self.keys.each do |element_type|
+        begin
+          return find(key, element_type)
+        rescue => exception
+          next
+        end
+      end
+      raise KeyError.new(key)
+    else
+      self[element_type][key]
+    end
+  end
+
+  def find_no_type(key)
+    self.keys.each do |element_type|
+      begin
+        return [find(key, element_type), element_type]
+      rescue => exception
+        next
+      end
+    end
+    raise KeyError.new(key)
+  end
+
+  def update(*args, **kwargs)
+    @mapping.update(*args, **kwargs)
+  end
+
+  def pop(key, default: nil)
+    @mapping.delete(key) || default
+  end
+
+  def keys
+    @mapping.keys
+  end
+
+  def values
+    @mapping.values
+  end
+
+  def items
+    @mapping
+  end
+
+  def _serializable_container
+    encoded_index = {}
+    container = {
+      'keys': keys
+    }
+    self.each do |key, offset|
+      if offset.is_a?(Hash)
+        encoded_index[key] = offset.to_a
+      elsif offset.is_a?(String)
+        encoded_index[key] = offset.split('')
+      else
+        encoded_index[key] = offset
+      end
+    end
+    container['index'] = encoded_index
+    container
+  end
 end
 
 def _make_chain(reader, readername, full_output: false)
@@ -614,5 +729,327 @@ def _make_chain(reader, readername, full_output: false)
 
   def chain(*files, **kwargs)
     _iter(files, kwargs)
+  end
+
+  def from_iterable(files, **kwargs)
+    _iter(files, kwargs)
+  end
+
+  #@contextmanager
+  def _chain(...)
+    yield chain(...)
+  end
+
+  #@contextmanager
+  def _from_iterable(...)
+    yield from_iterable(...)
+  end
+
+  def dispatch(...)
+    dispatch_from_iterable(...)
+  end
+
+  def dispatch_from_iterable(args, **kwargs)
+    if kwargs['full_output'] || full_output
+      return concat_results(*args, **kwargs)
+    end
+    return _chain(*args, **kwargs)
+  end
+
+  dispatch.__doc__ = "Chain :py:func:`#{readername}` for several files. Positional arguments should be file names or file objects. Keyword arguments are passed to the :py:func:`#{readername}` function."
+  dispatch_from_iterable.__doc__ = "Chain :py:func:`#{readername}` for several files. Keyword arguments are passed to the :py:func:`#{readername}` function./nParameters/n----------/nfiles : iterable/n    Iterable of file names or file objects.\n"
+  dispatch.from_iterable = dispatch_from_iterable
+  dispatch
+end
+
+def _check_use_index(source, use_index, default)
+  begin
+    if use_index.nil?.!
+      use_index = ['', 0, false, [], {}].include?(use_index) ? false : true
+    end
+
+    if source.is_a?(BaseString)
+      return (use_index.nil?.! ? use_index : default)
+    end
+
+    if source.respond_to?(:seekable)
+      seekable = source.seekable()
+    else
+      seekable = nil
+    end
+
+    if source.respond_to?(:mode)
+      binary = source.mode.include?('b')
+    else
+      binary = nil
+    end
+
+    if seekable == false
+      if binary
+        raise PyteomicsError.new("Cannot work with non-seekable file in binary mode: #{source}.")
+      end
+      if use_index
+        warn "Cannot use indexing as #{source} is not seekable. Setting `use_index` to False."
+        use_index = false
+      end
+    elsif binary.nil?.!
+      if use_index.nil?.! && binary != use_index
+        warn "use_index is #{use_index}, but the file mode is #{source.mode}. Setting `use_index` to #{binary}"
+      end
+      use_index = binary
+    elsif use_index.nil?
+      warn "Could not check mode on #{source}. Specify `use_index` explicitly to avoid errors."
+    end
+
+    if use_index.nil?.!
+      return use_index
+    end
+
+    return default
+  rescue => exception
+    if exception.is_a?(PyteomicsError)
+      raise
+    else
+      if use_index.nil?
+        warnings.warn('Could not check mode on {}. Reason: {!r}. Specify `use_index` explicitly to avoid errors.'.format(source, e))
+        return default
+      end
+      return use_index
+    end
+  end
+end
+
+class FileReadingProcess
+  # Not started
+end
+
+begin
+  require 'etc'
+  _NPROC = Etc.nprocessers  
+rescue => exception
+  _NPROC = 4
+end
+_QUEUE_TIMEOUT = 4
+_QUEUE_SIZE = 1e7.to_i
+
+class TaskMappingMixin
+  include NoOpBaseReader
+  def initialize(...)
+    __init__(...)
+  end
+
+  def __init__(*args, **kwargs)
+    @_queue_size = kwargs.delete('queue_size', _QUEUE_SIZE)
+    @_queue_timeout = kwargs.delete('timeout', _QUEUE_TIMEOUT)
+    @_nproc = kwargs.delete('processes', _NPROC)
+    super
+  end
+
+  def _get_reader_for_worker_spec
+    self
+  end
+
+  def _build_worker_spec(target, args, kwargs)
+    serialized = []
+    [[_get_reader_for_worker_spec(), 'reader'], [target, 'target'], [args, 'args'], [kwargs, 'kwargs']].each do |obj, objname|
+      begin
+        serialized << serializer.dumps(obj)
+      rescue => exception
+        msg = "Could not serialize #{objname} #{obj} with #{serializer.__name__}."
+        if serializer != dill
+            msg += ' Try installing `dill`.'
+        end
+        raise PyteomicsError.new(msg)
+      end
+    end
+    serialized
+  end
+
+  def _spawn_workers(specifications, in_queue, out_queue, processes)
+    reader_spec, target_spec, args_spec, kwargs_spec = specifications
+    workers = []
+    processes.times do
+      worker = FileReadingProcess.new(
+        reader_spec, target_spec, in_queue, out_queue, args_spec, kwargs_spec)
+      workers << worker
+    end
+    workers
+  end
+
+  def _spawn_feeder_thread(in_queue, iterator, processes)
+    def feeder()
+      iterator.each do |key|
+        in_queue << key
+      end
+      processes.times do
+        in_queue << nil
+      end
+    end
+
+    feeder_thread = threading.Thread(target=feeder)
+    feeder_thread.daemon = true
+    feeder_thread.start()
+    feeder_thread
+  end
+
+  def map(target:nil , processes: -1, args: nil, kwargs: nil, **_kwargs)
+    if @_offset_index.nil?
+      raise PyteomicsError.new('The reader needs an index for map() calls. Create the reader with `use_index=True`.')
+    end
+
+    if processes < 1
+      processes = @_nproc
+    end
+    iterator = _task_map_iterator()
+
+    if args.nil?
+      args = []
+    else
+      if args.is_a?(Hash)
+        args = args.to_a
+      elsif args.is_a?(String)
+        args = args.split('')
+      else
+        args = args.to_a
+      end
+    end
+    if kwargs.nil?
+      kwargs = {}
+    else
+      kwargs = kwargs.to_h
+    end
+    kwargs.merge!(_kwargs)
+
+    serialized = _build_worker_spec(target, args, kwargs)
+
+    # in_queue = mp.Queue(self._queue_size)
+    # out_queue = mp.Queue(self._queue_size)
+    in_queue = []
+    out_queue = []
+
+    workers = _spawn_workers(serialized, in_queue, out_queue, processes)
+    feeder_thread = _spawn_feeder_thread(in_queue, iterator, processes)
+    # for worker in workers:
+    #   worker.start()
+
+    def iterate()
+      while true
+        begin
+          result = out_queue.get(True, @_queue_timeout)
+          yield result
+        rescue => exception
+          if workers.map{ |w| w.is_done }.all?
+            break
+          else
+            next
+          end
+      
+        end
+      end
+      feeder_thread.join()
+      workers.each do |worker|
+        worker.join()
+      end
+    end
+    return iterate()
+  end
+
+  def _task_map_iterator
+    @_offset_index.keys.tu_enum
+  end
+end
+
+class ChainBase
+  def initialize(...)
+    __init__(...)
+  end
+
+  def __init__(*sources, **kwargs)
+    @sources = sources
+    @kwargs = kwargs
+    @_iterator = nil
+  end
+
+  def self.from_iterable(sources, **kwargs)
+    self.new(*sources, **kwargs)
+  end
+
+  def self._make_chain(sequence_maker)
+    if sequence_maker.is_a?(type)
+      tp = type("#{sequence_maker.__class__.__name__}Chain", [self], {'sequence_maker' => sequence_maker})
+    else
+      tp = type('FunctionChain', [self], {'sequence_maker' => staticmethod(sequence_maker)})
+    end
+    tp
+  end
+
+  def sequence_maker(file)
+    raise NotImplementedError.new()
+  end
+
+  def _create_sequence(file)
+    sequence_maker(file, **@kwargs)
+  end
+
+  def _iterate_over_series
+    @sources.each do |f|
+      _create_sequence(f) do |r|
+        r.each do |item|
+          yield item
+        end
+      end
+    end
+  end
+
+  def __enter__
+    @_iterator = _iterate_over_series().to_enum
+    self
+  end
+
+  def __exit__(*args, **kwargs)
+    @_iterator = nil
+  end
+
+  def __iter__
+    self
+  end
+
+  def __next__
+    if @_iterator.nil?
+      @_iterator = _iterate_over_series()
+    end
+    _next(@_iterator)
+  end
+
+  def _next
+    __next__()
+  end
+
+  def map(target: nil, processes: -1, queue_timeout: _QUEUE_TIMEOUT, args: nil, kwargs: nil, **_kwargs)
+    @sources.each do |f|
+      _create_sequence(f) do |r|
+        r.map(target, processes, queue_timeout, args, kwargs, **_kwargs).each do |result|
+          yield result
+        end
+      end
+    end
+  end
+end
+
+class TableJoiner < ChainBase
+  def concatenate(results)
+    if results.map{ |a| a.is_a?(Pandas.DataFrame) }.all?
+      return Pandas.concat(results)
+    end
+    if results[0].is_a?(Numpy.ndarray)
+      return Numpy.concatenate(results)
+    else
+      return Numpy.array(results.map{ |a| a.map{ |b| b } })
+    end
+  end
+
+  def _iterate_over_series
+    results = @sources.map{ |f| _create_sequence(f) }
+    return concatenate(results)
   end
 end
