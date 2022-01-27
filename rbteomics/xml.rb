@@ -15,6 +15,7 @@ require 'numpy'
 # from .auxiliary import TaskMappingMixin, IndexedReaderMixin, IndexSavingMixin
 require_relative 'auxiliary/structures'
 require_relative 'auxiliary/file_helpers'
+require_relative 'auxiliary/utils'
 BaseString ||= String
 
 
@@ -24,6 +25,7 @@ BaseString ||= String
 #     from urllib.request import urlopen, URLError
 require 'set'
 require 'open-uri'
+require 'delegate'
 
 def _local_name(element)
   tag = element.tag
@@ -91,7 +93,7 @@ module XMLValueConverter
   end
 end
 
-SXMLParam ||= Struct.new(:xmlparam, [:name, :value, :type])
+SXMLParam ||= Struct.new(:name, :value, :type)
 
 class XMLParam
   def initialize(sxmlparam: nil)
@@ -113,8 +115,29 @@ def xpath(tree, path, ns: nil)
   # Not started
 end
 
-def _make_version_info
-  # Not started
+def _make_version_info(cls)
+  def version_info(source)
+    cls.new(source).version_info
+  end
+  # version_info.__doc__ = "
+  version_info.__doc__ = "
+  Provide version information about the #{cls.file_format} file.
+
+  .. note:: This function is provided for backward compatibility only.
+      It simply creates an :py:class:`#{cls.__name__}` instance
+      and returns its :py:data:`!version_info` attribute.
+
+  Parameters
+  ----------
+  source : str or file
+      File name or file-like object.
+
+  Returns
+  -------
+  out : tuple
+      A (version, schema URL) tuple, both elements are strings or None.
+  "
+  version_info('Not started')
 end
 
 class ByteCountingXMLScanner < File_obj
@@ -262,8 +285,9 @@ class IndexedXML < XML
   def _build_index
     if ['', 0, nil, false, [], {}].include?(@_indexed_tags) || ['', 0, nil, false, [], {}].include?(@_use_index)
       return
+    end
     @_offset_index = TagSpecificXMLByteIndex.build(
-      @_source, @_indexed_tags, @_indexed_tag_keys)
+      @_source, indexed_tags: @_indexed_tags, keys: @_indexed_tag_keys)
   end
 
   #@_keepstate
@@ -310,9 +334,21 @@ class IndexedXML < XML
 end
 
 class MultiProcessingXML < IndexedXML
-  include TaskMappingMixin
+  # include TaskMappingMixin
+
+  def initialize(...)
+    super
+    @tmmixin = TaskMappingMixin.new
+  end
+
   def _task_map_iterator
     @_offset_index[self._default_iter_tag].to_enum
+  end
+
+  def method_missing(name, *args)
+    if @tmmixin.respond_to?(name)
+      raise NoMethodError.new(name)
+    end
   end
 end
 
@@ -459,8 +495,9 @@ class Iterfind
   end
 end
 
-class IndexedIterfind < Iterfind
-  prepend TaskMappingMixin
+class IndexedIterfind
+# class IndexedIterfind < Iterfind
+#     prepend TaskMappingMixin
   
   def initialize(...)
     __init__(...)
@@ -468,6 +505,8 @@ class IndexedIterfind < Iterfind
 
   def __init__(parser, tag_name, **kwargs)
     super
+    @tmmixin = TaskMappingMixin.new(**kwargs)
+    @ifind = Iterfind.new(parser, tag_name, **kwargs)
   end
 
   def _task_map_iterator
@@ -521,5 +560,13 @@ class IndexedIterfind < Iterfind
 
   def __len__
     @index.size
+  end
+
+  def method_missing(name, *args)
+    [@tmmixin, @ifind].each do |x|
+      if x.respond_to?(name)
+        raise NoMethodError.new(name)
+      end  
+    end
   end
 end

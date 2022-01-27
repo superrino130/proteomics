@@ -5,16 +5,15 @@ require_relative 'xml'
 require_relative 'auxiliary/file_helpers'
 require_relative '_schema_defaults'
 require 'set'
-
-class PepXML < IndexedXML
-  prepend IndexSavingMixin
-  include TaskMappingMixin
+class PepXML
+# class PepXML < IndexedXML
+  # prepend IndexSavingMixin
+  # include TaskMappingMixin
   #class PepXML(xml.MultiProcessingXML, xml.IndexSavingXML):
   #class MultiProcessingXML(IndexedXML, TaskMappingMixin):
   #class IndexSavingXML(IndexSavingMixin, IndexedXML):
 
   def initialize
-    super
     @_index_class = HierarchicalOffsetIndex.new
     @file_format = 'pepXML'
     @_root_element = 'msms_pipeline_analysis'
@@ -32,23 +31,26 @@ class PepXML < IndexedXML
       'bool' => Set.new(['is_rejected']),
       'floatarray' => Set.new(['all_ntt_prob'])
     }
+
+    @mpx = MultiProcessingXML.new
+    @isx = IndexSavingXML.new
   end
 
-  # from class IndexSavingXML
-  def _read_byte_offsets
-    File.open(@_byte_offset_filename, 'r') { |f|
-      index = @_index_class.load(f)
-      if index.schema_version.nil?
-        raise TypeError("Legacy Offset Index!")
-      end
-      @_offset_index = index
-    }
-  end
+  # # from class IndexSavingXML
+  # def _read_byte_offsets
+  #   File.open(@_byte_offset_filename, 'r') { |f|
+  #     index = @_index_class.load(f)
+  #     if index.schema_version.nil?
+  #       raise TypeError("Legacy Offset Index!")
+  #     end
+  #     @_offset_index = index
+  #   }
+  # end
   
-  # from class MultiProcessingXML
-  def _task_map_iterator
-    @_offset_index[self._default_iter_tag].to_enum
-  end
+  # # from class MultiProcessingXML
+  # def _task_map_iterator
+  #   @_offset_index[self._default_iter_tag].to_enum
+  # end
 
   def _get_info_smart(element, **kwargs)
     if kwargs.include?('ename')
@@ -153,9 +155,19 @@ class PepXML < IndexedXML
     end
     info
   end
+
+  def method_missing(name, *args)
+    [@mpx, @isx].each do |x|
+      if x.respond_to?(name)
+        raise NoMethodError.new(name)
+      end
+    end  
+  end
 end
 
-def read(source, read_schema: false, iterative: true, **kwargs)
+def read(source, **kwargs)
+  read_schema = kwargs['read_schema'] || false
+  iterative = kwargs['iterative'] ||  true
   PepXML.new(source, read_schema: read_schema, iterative: iterative)
 end
 
@@ -163,13 +175,53 @@ def iterfind(source, path, **kwargs)
   PepXML.new(source, **kwargs).iterfind(path, **kwargs)
 end
 
-Version_info = _make_version_info(PepXML)
+# Version_info = _make_version_info(PepXML)
 
 def roc_curve(source)
+  # parser = etree.XMLParser(remove_comments: true, ns_clean: true)
   tree = REXML::Document.new(source)
 
   roc_curve = []
-
+  tree.xpath(
+    "/*[local-name()='msms_pipeline_analysis'] \
+    //*[local-name()='analysis_summary' and @analysis='peptideprophet'] \
+    //*[local-name()='peptideprophet_summary'] \
+    //*[local-name()='roc_error_data']"
+  ).each do |roc_error_data|
+    roc_error_data.xpath("*[local-name()='roc_data_point' or local-name()='error_point']").each do |element|
+      data_point = element.attrib.to_a
+      data_point.each do |key|
+        data_point[key] = data_point[key].to_f
+      end
+      data_point["charge"] = roc_error_data.attrib["charge"]
+      data_point["tag"] = etree.QName(element).localname
+      roc_curve << data_point
+    end
+  end
+  roc_curve
 end
 
-Chain = ChainBase._make_chain(read)
+Chain = ChainBase._make_chain('read')
+
+def _is_decoy_prefix(psm, prefix: 'DECOY_')
+  psm['search_hit'][0]['proteins'].map{ |protein| protein['protein'].start_with(prefix) }.all?
+end
+
+def _is_decoy_suffix(psm, suffix: '_DECOY')
+  psm['search_hit'][0]['proteins'].map{ |protein| protein['protein'].end_with(suffix) }.all?
+end
+
+IS_decoy = _is_decoy_prefix
+FDR = _make_fdr(_is_decoy_prefix, _is_decoy_suffix)
+_key = lambda { |x| x['search_hit'].min{ |sh| sh['search_score']['expect'] } }
+Qvalues = _make_qvalues(Chain, _is_decoy_prefix, _is_decoy_suffix, _key)
+Filter = _make_filter(Chain, _is_decoy_prefix, _is_decoy_suffix, _key, Qvalues)
+Filter.chain = _make_chain(Filter, 'filter', true)
+
+def DataFrame(*args, **kwargs)
+  import Pandas
+  kwargs = kwargs.dup
+  sep = kwargs.pop('sep', None)
+  pd_kwargs = kwargs.pop('pd_kwargs', {})
+
+end
