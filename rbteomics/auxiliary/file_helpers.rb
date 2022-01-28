@@ -975,16 +975,25 @@ class ChainBase
   end
 
   def self._make_chain(sequence_maker)
-    if sequence_maker.is_a?(type)
-      tp = type("#{sequence_maker.__class__.__name__}Chain", [self], {'sequence_maker' => sequence_maker})
+    if sequence_maker.instance_of?(Class)
+      tp = sequence_maker.class.to_s.concat('Chain')
+      tp = Class.new(self) {
+        def sequence_maker
+          raise NotImplementedError.new
+        end
+        define_method(sequence_maker.to_s, instance_method(:sequence_maker))
+      }
     else
-      tp = type('FunctionChain', [self], {'sequence_maker' => staticmethod(sequence_maker)})
+      functionChain = Class.new(self)
+      functionChain.define_singleton_method(sequence_maker) do
+        raise NotImplementedError.new
+      end
+      return functionChain
     end
-    tp
   end
 
   def sequence_maker(file)
-    raise NotImplementedError.new()
+    raise NotImplementedError.new
   end
 
   def _create_sequence(file)

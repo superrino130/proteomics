@@ -337,7 +337,6 @@ end
 
 # Fiber
 def isotopologues(*args, **kwargs)
-  # Fiber.new do
     iso_threshold = kwargs.delete('isotope_threshold') || 5e-4
     overall_threshold = kwargs.delete('overall_threshold') || 0.0
     mass_data = kwargs['mass_data'] || NIST_mass
@@ -374,19 +373,15 @@ def isotopologues(*args, **kwargs)
         abundance = isotopic_composition_abundance('composition' => ic, **other_kw)
         if abundance > overall_threshold
           if report_abundance
-            # Fiber.yield [ic, abundance]
             yield [ic, abundance]
           else
-            # Fiber.yield ic
             yield ic
           end
         end
       else
-        # Fiber.yield ic
         yield ic
       end
     end
-  # end
 end
 
 STD_aa_mass = {

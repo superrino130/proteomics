@@ -3,6 +3,7 @@ require 'rexml/document'
 # from . import xml, auxiliary as aux, _schema_defaults
 require_relative 'xml'
 require_relative 'auxiliary/file_helpers'
+require_relative 'auxiliary/target_decoy'
 require_relative '_schema_defaults'
 require 'set'
 class PepXML
@@ -203,11 +204,11 @@ end
 
 Chain = ChainBase._make_chain('read')
 
-def _is_decoy_prefix(psm, prefix: 'DECOY_')
+_is_decoy_prefix = lambda do |psm, prefix: 'DECOY_'|
   psm['search_hit'][0]['proteins'].map{ |protein| protein['protein'].start_with(prefix) }.all?
 end
 
-def _is_decoy_suffix(psm, suffix: '_DECOY')
+_is_decoy_suffix = lambda do |psm, suffix: '_DECOY'|
   psm['search_hit'][0]['proteins'].map{ |protein| protein['protein'].end_with(suffix) }.all?
 end
 

@@ -191,3 +191,48 @@ def add_metaclass(metaclass)
   end
   wrapper
 end
+
+def islice(iterable, *args)
+  start = args[0] || 0
+  stop = args[1] || Float::INFINITY
+  step = args[2] || 1
+  cnt = 0
+  if iterable.is_a?(String)
+    it = iterable.split('').to_enum
+  else
+    it = iterable.to_enum
+  end
+  start.times do
+    it.next
+    cnt += 1
+  end
+  loop do
+    yield it.next
+    cnt += 1
+    step.pred.times do
+      it.next
+      cnt += 1
+    end
+    if stop < cnt
+      break
+    end
+  end
+end
+
+class Itemgetter
+  def initialize(*items)
+    if items.size == 1
+      @item = items[0]
+    else
+      @items = items
+    end
+  end
+
+  def g(obj)
+    if @item
+      obj[@item]
+    else
+      @items.map{ |item| obj[item] }
+    end
+  end
+end

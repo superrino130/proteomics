@@ -479,12 +479,12 @@ class Iterfind
 
   def _get_by_index(idx)
     self.reset()
-    value = _next(islice(idx, idx + 1))
+    value = _next(enum_for(:islice, self, idx, idx + 1))
   end
 
-  def _get_by_slice(slc)
+  def _get_by_slice(*slc)
     self.reset()
-    value = islice(slc.start, slc.stop, slc.step).to_a
+    value = enum_for(:islice, self, *slc)
   end
 
   def __getitem__(i)
