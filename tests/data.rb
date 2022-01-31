@@ -3,7 +3,7 @@ require 'numpy'
 # from copy import deepcopy
 # import sys
 # from pyteomics.auxiliary import basestring
-require_relative '../rbteomics/auxiliary'
+# require_relative '../rbteomics/auxiliary'
 BaseString ||= String
 
 class ComparableArray < Numpy.ndarray
@@ -52,8 +52,7 @@ Pepxml_results = [
          'proteins' => [{'num_tol_term' => 2,
                        'protein' => 'sp|P00722|BGAL_ECOLI',
                        'peptide_prev_aa' => 'R',
-                       'protein_descr' => 'BETA-GALACTOSIDASE (EC 3.2.1.23) '
-                                        '(LACTASE) - Escherichia coli.',
+                       'protein_descr' => 'BETA-GALACTOSIDASE (EC 3.2.1.23) (LACTASE) - Escherichia coli.',
                        'peptide_next_aa' => 'F'}],
          'calc_neutral_pep_mass' => 860.892}]},
     {'precursor_neutral_mass' => 677.392,
@@ -87,8 +86,7 @@ Pepxml_results = [
                      'proteins' => [{'num_tol_term' => 1,
                                    'protein' => 'gi|3212198|gb|AAC22319.1|',
                                    'peptide_prev_aa' => 'N',
-                                   'protein_descr' => 'hemoglobin-binding protein '
-                                                    '[Haemophilus influenzae Rd]',
+                                   'protein_descr' => 'hemoglobin-binding protein [Haemophilus influenzae Rd]',
                                    'peptide_next_aa' => 'I'}],
                      'calc_neutral_pep_mass' => 677.892}]},
     {'assumed_charge' => 2,
@@ -114,7 +112,7 @@ Pepxml_results = [
                      'peptide' => 'VGQFIR',
                      'analysis_result' => [{'analysis' => 'peptideprophet',
                                           'peptideprophet_result' =>
-                                              {'all_ntt_prob' => [0., 0.5741, 0.7264],
+                                              {'all_ntt_prob' => [0.0, 0.5741, 0.7264],
                                                'parameter' => {
                                                    'fval' => 0.6052, 'massd' => 0.001, 'nmc' => 0.0, 'ntt' => 2.0},
                                                'probability' => 0.7264}}],
@@ -213,7 +211,7 @@ Pepxml_results = [
      'spectrum' => '"Cmpd 24, +MSn(1085.6886), 1.2 min.23.23.3"',
      'start_scan' => 23}]
 
-mzid_spectra = {(false, false) => [{'id' => 'SEQ_spec1',
+mzid_spectra = {[false, false] => [{'id' => 'SEQ_spec1',
                                   'spectraData_ref' => 'LCMALDI_spectra',
                                   'spectrumID' => 'databasekey=1'},
                                  {'id' => 'SEQ_spec2a',
@@ -339,9 +337,9 @@ mzid_spectra = {(false, false) => [{'id' => 'SEQ_spec1',
                                  'SpectrumIDFormat' => 'spectrum from database nativeID format',
                                  'location' => 'proteinscape://www.medizinisches-proteom-center.de/PSServer/Project/Sample/Separation_1D_LC/Fraction_X',
                                  'spectrumID' => 'databasekey=40'}],
-
-                [true, false] => [{'SpectrumIdentificationItem' => [
-                    {'PeptideEvidenceRef' => [{'peptideEvidence_ref' => 'PE1_SEQ_spec1_pep1'}],
+                [true, false] => [
+                                {'SpectrumIdentificationItem' => [
+                                  {'PeptideEvidenceRef' => [{'peptideEvidence_ref' => 'PE1_SEQ_spec1_pep1'}],
                      'ProteinScape:IntensityCoverage' => 0.3919545603809718,
                      'ProteinScape:SequestMetaScore' => 7.59488518903425,
                      'calculatedMassToCharge' => 1507.695,
@@ -1300,8 +1298,10 @@ mzid_spectra = {(false, false) => [{'id' => 'SEQ_spec1',
                                 'location' => 'proteinscape://www.medizinisches-proteom-center.de/PSServer/Project/Sample/Separation_1D_LC/Fraction_X',
                                 'spectrumID' => 'databasekey=40'}]}
 
-mzml_mz_array = Numpy.load('test_mzml_mz.npy')
-mzml_int_array = Numpy.load('test_mzml_intensity.npy')
+# mzml_mz_array = Numpy.load('./test_mzml_mz.npy')
+mzml_mz_array = Numpy.load("C:\\Users\\2021g000\\Documents\\naka\\github\\proteomics\\tests\\test_mzml_mz.npy")
+# mzml_int_array = Numpy.load('./test_mzml_intensity.npy')
+mzml_int_array = Numpy.load("C:\\Users\\2021g000\\Documents\\naka\\github\\proteomics\\tests\\test_mzml_intensity.npy")
 mzml_spectra = [
   {'MSn spectrum' => '',
     'base peak intensity' => 1471973.875,
@@ -1354,17 +1354,17 @@ mzml_spectra = [
                                                                            'scan window upper limit' => 2000.0}]}}]},
                  'total ion current' => 15245068.0}]
 
-mgf_int = [Numpy.array([73., 44., 67., 291., 54., 49.]),
-           Numpy.array([237., 128., 108., 1007., 974., 79.])]
-mgf_mz = [Numpy.array([846.6, 846.8, 847.6, 1640.1, 1640.6, 1895.5]),
-          Numpy.array([345.1, 370.2, 460.2, 1673.3, 1674., 1675.3])]
-mgf_ch = [Numpy.ma.masked_equal([0] * 6, 0),
-          Numpy.array([3., 2., 1., 1., 1., 1.])]
+Mgf_int = [Numpy.array([73.0, 44.0, 67.0, 291.0, 54.0, 49.0]),
+           Numpy.array([237.0, 128.0, 108.0, 1007.0, 974.0, 79.0])]
+Mgf_mz = [Numpy.array([846.6, 846.8, 847.6, 1640.1, 1640.6, 1895.5]),
+          Numpy.array([345.1, 370.2, 460.2, 1673.3, 1674.0, 1675.3])]
+Mgf_ch = [Numpy.ma.masked_equal([0] * 6, 0),
+          Numpy.array([3.0, 2.0, 1.0, 1.0, 1.0, 1.0])]
 
-mgf_spectra_long = [
-  {'intensity array' => makeCA(mgf_int[0]),
-    'm/z array' => makeCA(mgf_mz[0]),
-    'charge array' => makeCA(mgf_ch[0]),
+Mgf_spectra_long = [
+  {'intensity array' => makeCA(Mgf_int[0]),
+    'm/z array' => makeCA(Mgf_mz[0]),
+    'charge array' => makeCA(Mgf_ch[0]),
     'params' => {'charge' => [2],
                'com' => 'Based on http://www.matrixscience.com/help/data_file_help.html',
                'it_mods' => 'Oxidation (M)',
@@ -1376,9 +1376,9 @@ mgf_spectra_long = [
                'title' => 'Spectrum 1',
                'useremail' => 'leu@altered-state.edu',
                'username' => 'Lou Scene'}},
-  {'intensity array' => makeCA(mgf_int[1]),
-    'm/z array' => makeCA(mgf_mz[1]),
-    'charge array' => makeCA(mgf_ch[1]),
+  {'intensity array' => makeCA(Mgf_int[1]),
+    'm/z array' => makeCA(Mgf_mz[1]),
+    'charge array' => makeCA(Mgf_ch[1]),
     'params' => {'charge' => [2, 3],
                'com' => 'Based on http://www.matrixscience.com/help/data_file_help.html',
                'it_mods' => 'Oxidation (M)',
@@ -1386,44 +1386,46 @@ mgf_spectra_long = [
                'itolu' => 'Da',
                'mass' => 'Monoisotopic',
                'mods' => 'Carbamidomethyl (C)',
-               'pepmass' => (1084.9, 1234.0),
+               'pepmass' => [1084.9, 1234.0],
                'rtinseconds' => 25.0,
                'scans' => '3',
                'title' => 'Spectrum 2',
                'useremail' => 'leu@altered-state.edu',
                'username' => 'Lou Scene'}}]
 
-mgf_spectra_short = [
-  {'intensity array' => makeCA(mgf_int[0]),
-    'charge array' => makeCA(mgf_ch[0]),
-    'm/z array' => makeCA(mgf_mz[0]),
+Mgf_spectra_short = [
+  {'intensity array' => makeCA(Mgf_int[0]),
+    'charge array' => makeCA(Mgf_ch[0]),
+    'm/z array' => makeCA(Mgf_mz[0]),
     'params' => {'pepmass' => [983.6, nil], 'title' => 'Spectrum 1',
                'charge' => [2]}},
-   {'intensity array' => makeCA(mgf_int[1]),
-    'm/z array' => makeCA(mgf_mz[1]),
-    'charge array' => makeCA(mgf_ch[1]),
+   {'intensity array' => makeCA(Mgf_int[1]),
+    'm/z array' => makeCA(Mgf_mz[1]),
+    'charge array' => makeCA(Mgf_ch[1]),
     'params' => {'pepmass' => [1084.9, 1234.0],
                'rtinseconds' => 25.0,
                'scans' => '3',
                'title' => 'Spectrum 2'}}]
 
-mgf_spectra_short_no_charges = deepcopy(mgf_spectra_short)
-for s in mgf_spectra_short_no_charges:
-    del s['charge array']
-mgf_spectra_long_no_charges = deepcopy(mgf_spectra_long)
-for s in mgf_spectra_long_no_charges:
-    del s['charge array']
-
-mgf_spectra_lists = deepcopy(mgf_spectra_long)
-for s in mgf_spectra_lists:
-    for key in ['m/z array', 'intensity array', 'charge array']:
-        s[key] = list(s[key])
-
-mgf_annotated_int = [Numpy.array([0.013, 0.049, 0.059, 0.012, 0.454, 0.002, 0.956, 0.098]),
+Mgf_spectra_short_no_charges = Mgf_spectra_short.dup
+Mgf_spectra_short_no_charges.each do |s|
+  s.delete('charge array')
+end
+Mgf_spectra_long_no_charges = Mgf_spectra_long.dup
+Mgf_spectra_long_no_charges.each do |s|
+  s.delete('charge array')
+end
+Mgf_spectra_lists = Mgf_spectra_long.dup
+Mgf_spectra_lists.each do |s|
+  ['m/z array', 'intensity array', 'charge array'].each do |key|
+    s[key] = s[key].to_a
+  end
+end
+Mgf_annotated_int = [Numpy.array([0.013, 0.049, 0.059, 0.012, 0.454, 0.002, 0.956, 0.098]),
                      Numpy.array([0.597, 0.091, 0.063, 0.177, 0.165, 0.038, 0.043, 0.026, 0.213, 0.288, 0.177])]
-mgf_annotated_mz = [Numpy.array([138.0, 153.5, 375.1, 484.2, 662.8, 698.3, 1130.2, 1395.4]),
+Mgf_annotated_mz = [Numpy.array([138.0, 153.5, 375.1, 484.2, 662.8, 698.3, 1130.2, 1395.4]),
                     Numpy.array([156.0, 157.1, 162.5, 211.1, 227.1, 228.1, 418.1, 698.3, 835.3, 949.4, 1112.7])]
-mgf_annotated_ions = [Numpy.array(["b1+1", "b3+2", "y3+1", "y7+2", "y10+2", "y11+2", "y8+1", "y11+1"]),
+Mgf_annotated_ions = [Numpy.array(["b1+1", "b3+2", "y3+1", "y7+2", "y10+2", "y11+2", "y8+1", "y11+1"]),
                       Numpy.array(["y1+1", "b1+1", "y3+2", "y4+2", "y2+1", "b2+1", "b6+2", "y6+1", "b6+1", "b7+1",
                                 "b8+1"])]
 
@@ -1449,24 +1451,26 @@ Mgf_spectra_annotated_long = [
 
 def decode_dict(d, encoding='utf-8')
   out = {}
-  d.instance_of?(BaseString)
+  if d.is_a?(BaseString)
+    return d.decode(encoding)
+  end
+  if d.is_a?(Hash).!
+    return d
+  end
+  d.each do |k, v|
+    newk = k.decode(encoding)
+    if v.is_a?(BaseString)
+      out[newk] = v.decode(encoding)
+    elsif v.is_a?(Hash)
+      out[newk] = decode_dict(v, encoding)
+    elsif v.is_a?(Array)
+      out[newk] = v.map{ |i| decode_dict(i) }
+    else
+      out[newk] = v
+    end
+  end
+  out
 end
-    if isinstance(d, BaseString):
-        return d.decode(encoding)
-    if not isinstance(d, dict):
-        return d
-    for k, v in d.items():
-        newk = k.decode(encoding)
-        if isinstance(v, BaseString):
-            out[newk] = v.decode(encoding)
-        elif isinstance(v, dict):
-            out[newk] = decode_dict(v, encoding)
-        elif isinstance(v, list):
-            out[newk] = [decode_dict(i) for i in v]
-        else:
-            out[newk] = v
-    return out
-
 
 Mgf_spectra_long_decoded = Mgf_spectra_long
 
@@ -1610,8 +1614,8 @@ Tandem_spectra = [{'act' => '0',
                                                                              526.277, 637.355]))},
                                                               'Ydata' => {'units' => 'UNKNOWN',
                                                                         'values' => makeCA(Numpy.array(
-                                                                            [2., 22., 3., 13., 4., 1., 5., 2., 2.,
-                                                                             2., 10., 100., 4., 6.]))},
+                                                                            [2.0, 22.0, 3.0, 13.0, 4.0, 1.0, 5.0, 2.0, 2.0,
+                                                                             2.0, 10.0, 100.0, 4.0, 6.0]))},
                                                               'charge' => 2,
                                                               'id' => '11745',
                                                               'label' => '11745.spectrum',
@@ -2089,8 +2093,8 @@ Mzxml_spectra = [
      'retentionTime' => 5.9446666666666665}]
 
 Ms1_spectra = [
-    {'intensity array' => makeCA([0., 20.0522, 29.26406, 30.04175, 20.19221, 11.58895,
-                                0.]),
+    {'intensity array' => makeCA([0.0, 20.0522, 29.26406, 30.04175, 20.19221, 11.58895,
+                                0.0]),
      'm/z array' => makeCA([2.51263, 82.51282, 82.51301, 82.51321, 82.5134, 82.51359,
                           82.51378]),
      'params' => {'BPI' => '585566',
@@ -2098,8 +2102,8 @@ Ms1_spectra = [
                 'RTime' => 0.987225,
                 'TIC' => '3728760',
                 'scan' => ['1', '1']}},
-    {'intensity array' => makeCA([0., 31.2197, 37.46051, 44.36585, 49.12939, 44.33195,
-                                35.1637, 33.48032, 0.]),
+    {'intensity array' => makeCA([0.0, 31.2197, 37.46051, 44.36585, 49.12939, 44.33195,
+                                35.1637, 33.48032, 0.0]),
      'm/z array' => makeCA([82.6435, 82.6437, 82.64389, 82.64408, 82.64427, 82.64447,
                           82.64466, 82.64485, 82.64504]),
      'params' => {'BPI' => '713524',
@@ -2108,14 +2112,14 @@ Ms1_spectra = [
                 'TIC' => '2694200',
                 'scan' => ['2', '2']}}]
 
-Ms1_spectra_lists = [{'intensity array' => [0., 20.0522, 29.26406, 30.04175, 20.19221, 11.58895, 0.],
+Ms1_spectra_lists = [{'intensity array' => [0.0, 20.0522, 29.26406, 30.04175, 20.19221, 11.58895, 0.0],
                       'm/z array' => [2.51263, 82.51282, 82.51301, 82.51321, 82.5134, 82.51359, 82.51378],
                       'params' => {'BPI' => '585566',
                                  'BPM' => '544.2904',
                                  'RTime' => 0.987225,
                                  'TIC' => '3728760',
                                  'scan' => ['1', '1']}},
-                     {'intensity array' => [0., 31.2197, 37.46051, 44.36585, 49.12939, 44.33195, 35.1637, 33.48032, 0.],
+                     {'intensity array' => [0.0, 31.2197, 37.46051, 44.36585, 49.12939, 44.33195, 35.1637, 33.48032, 0.0],
                       'm/z array' => [82.6435, 82.6437, 82.64389, 82.64408, 82.64427, 82.64447, 82.64466, 82.64485,
                                     82.64504],
                       'params' => {'BPI' => '713524',
@@ -2129,24 +2133,24 @@ Ms1_header = {'CreationDate' => 'Sat Jun 03 15:25:10 2017',
               'Extractor' => 'ProteoWizard',
               'Source file' => 'Set 1. B2 at 193 nm RT.RAW'}
 
-Ms2_spectra = [{'intensity array' => makeCA([73., 44., 67., 291., 54., 49.]),
+Ms2_spectra = [{'intensity array' => makeCA([73.0, 44.0, 67.0, 291.0, 54.0, 49.0]),
                 'm/z array' => makeCA([846.6, 846.8, 847.6, 1640.1, 1640.6, 1895.5]),
                 'params' => {'charge' => [2.0],
                            'neutral mass' => [1966.193],
                            'precursor m/z' => 983.6,
                            'scan' => ['0', '0']}},
-               {'intensity array' => makeCA([237., 128., 108., 1007., 974., 79.]),
-                'm/z array' => makeCA([345.1, 370.2, 460.2, 1673.3, 1674., 1675.3]),
+               {'intensity array' => makeCA([237.0, 128.0, 108.0, 1007.0, 974.0, 79.0]),
+                'm/z array' => makeCA([345.1, 370.2, 460.2, 1673.3, 1674.0, 1675.3]),
                 'params' => {'RTime' => 25.0, 'precursor m/z' => 1084.9, 'scan' => ['1', '1']}}]
 
-Ms2_spectra_lists = [{'intensity array' => [73., 44., 67., 291., 54., 49.],
+Ms2_spectra_lists = [{'intensity array' => [73.0, 44.0, 67.0, 291.0, 54.0, 49.0],
                       'm/z array' => [846.6, 846.8, 847.6, 1640.1, 1640.6, 1895.5],
                       'params' => {'charge' => [2.0],
                                  'neutral mass' => [1966.193],
                                  'precursor m/z' => 983.6,
                                  'scan' => ['0', '0']}},
-                     {'intensity array' => [237., 128., 108., 1007., 974., 79.],
-                      'm/z array' => [345.1, 370.2, 460.2, 1673.3, 1674., 1675.3],
+                     {'intensity array' => [237.0, 128.0, 108.0, 1007.0, 974.0, 79.0],
+                      'm/z array' => [345.1, 370.2, 460.2, 1673.3, 1674.0, 1675.3],
                       'params' => {'RTime' => 25.0, 'precursor m/z' => 1084.9, 'scan' => ['1', '1']}}]
 
 Ms2_header = {'CreationDate' => 'Wed Apr 24 17:06:23 2019',

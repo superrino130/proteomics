@@ -30,10 +30,9 @@ require 'set'
 
 def _fix_docstring(f, **defaults)
   defaults.each do |argname, v|
-    if !!v
+    if v.nil?.!
       # f.__doc__ = re.sub('{} : .*'.format(argname),
       #                          lambda m: m.group() + ', optional', f.__doc__)
-      f.__doc__ = ""
     end
   end
 end
@@ -49,7 +48,7 @@ def _calculate_qvalues(scores, isdecoy, **kwargs)
   end
 
   cumsum = isdecoy.cumsum(dtype: Numpy.float64)
-  tfalse = cumsum.copy()
+  tfalse = cumsum.dup
   ind = Numpy.arange(1.0, scores.shape[0] + 1.0, dtype: Numpy.float64)
 
   if peps
@@ -59,17 +58,17 @@ def _calculate_qvalues(scores, isdecoy, **kwargs)
       if correction == 1
         tfalse += 1
       elsif
-        p = 1.0 / (1.0 + ratio)
+        ps = 1.0 / (1.0 + ratio)
         targ = ind - cumsum
         tfalse.size.times do |i|
-          tfalse[i] = _expectation(cumsum[i], targ[i], p)
+          tfalse[i] = _expectation(cumsum[i], targ[i], ps)
         end
       end
     elsif 0 < correction && correction < 1
-      p = 1.0 / (1.0 + ratio)
+      ps = 1.0 / (1.0 + ratio)
       targ = ind - cumsum
       tfalse.size.times do |i|
-        tfalse[i] = _confidence_value(correction, cumsum[i], targ[i], p)
+        tfalse[i] = _confidence_value(correction, cumsum[i], targ[i], ps)
       end
     elsif correction
       raise PyteomicsError.new("Invalid value for 'correction'.")
@@ -94,10 +93,10 @@ def _qvalues_df(psms, keyf, isdecoy, **kwargs)
   remove_decoy = kwargs['remove_decoy'] || false
   peps = kwargs['pep']
   decoy_or_pep_label = _decoy_or_pep_label(**kwargs)
-  q_label = kwargs.key?('q_label') ? kwargs['q_label'] : kwargs['q_label'] = 'q'
-  score_label = kwargs.key?('score_label') ? kwargs['score_label'] : kwargs['score_label'] = 'score'
-  keyf = psms.apply(keyf, axis=1) if defined?(keyf)
-  isdecoy = psms.apply(isdecoy, axis=1) if defined?(isdecoy)
+  q_label = kwargs.include?('q_label') ? kwargs['q_label'] : kwargs['q_label'] = 'q'
+  score_label = kwargs.include?('score_label') ? kwargs['score_label'] : kwargs['score_label'] = 'score'
+  keyf = psms.apply(keyf, axis: 1) if callable?(keyf)
+  isdecoy = psms.apply(isdecoy, axis: 1) if callable?(isdecoy)
   if keyf.instance_of?(String)
     if psms.shape[0]
       psms[score_label] = keyf
@@ -131,17 +130,17 @@ def _qvalues_df(psms, keyf, isdecoy, **kwargs)
       psms[q_label] = []
       return psms
     else
-      return Numpy.array([], dtype=dtype)
+      return Numpy.array([], dtype: dtype)
     end
   end
 
   q = _calculate_qvalues(psms[keyf].values, psms[isdecoy].values, peps.nil?.!, **kwargs)
   if remove_decoy
     q = q[~psms[isdecoy].values]
-    psms = psms[~psms[isdecoy]].copy()
+    psms = psms[~psms[isdecoy]].dup
   end
   if full.!
-    psms_ = Numpy.empty_like(q, dtype=dtype)
+    psms_ = Numpy.empty_like(q, dtype: dtype)
     psms_[keyf] = psms[keyf] if peps.nil?
     psms_[isdecoy] = psms[isdecoy]
     psms_[q_label] = q
@@ -188,25 +187,26 @@ end
 def _make_qvalues(read, is_decoy_prefix, is_decoy_suffix, key)
   @mq_is_decoy_prefix = is_decoy_prefix
   @mq_key = key
-  def qvalues(*args, **kwargs)
+  @qvalues = lambda do |*args, **kwargs|
     #@_keepstate
     def get_scores(*args, **kwargs)
       scores = []
-      f = read(*args, **kwargs)
-      f.each_with_index do |psm, i|
-        row = []
-        [keyf, isdecoy].each do |func|
-          if defined?(func)
-            row << func(psm)
-          elsif func.instance_of?(String)
-            row << psm[func]
-          else
-            row << func[i]
+      File.open(*args) do |f|
+        f.each_with_index do |psm, i|
+          row = []
+          [keyf, isdecoy].each do |func|
+            if func.instance_of?(String)
+              row << psm[func]
+            elsif callable?(func)
+              row << func(psm)
+            else
+              row << func[i]
+            end
           end
+          row << nil
+          row << psm if full
+          scores << [row]
         end
-        row << nil
-        row << psm if full
-        scores << [row]
       end
       scores
     end
@@ -228,7 +228,7 @@ def _make_qvalues(read, is_decoy_prefix, is_decoy_suffix, key)
       end
     end
 
-    if defined?(keyf).! && [Sized, Container].include?(keyf.class).!
+    if callable?(keyf).! && sizeable?(keyf.class).! && includeable?(keyf.class).!
       keyf = Numpy.array(keyf.to_a)
     end
 
@@ -248,32 +248,32 @@ def _make_qvalues(read, is_decoy_prefix, is_decoy_suffix, key)
       isdecoy = peps
     end
     
-    if defined?(isdecoy).! and [Sized, Container].include?(isdecoy.class).!
+    if callable?(isdecoy).! && sizeable?(keyf.class).! && includeable?(keyf.class).!
       isdecoy = Numpy.array(isdecoy.to_a)
     end
     remove_decoy = kwargs['remove_decoy'] || false
     decoy_or_pep_label = _decoy_or_pep_label(**kwargs)
-    score_label = kwargs.key?('score_label') ? kwargs['score_label'] : kwargs['score_label'] = 'score'
-    q_label = kwargs.key?('q_label') ? kwargs['q_label'] : kwargs['q_label'] = 'q'
+    score_label = kwargs.include?('score_label') ? kwargs['score_label'] : kwargs['score_label'] = 'score'
+    q_label = kwargs.include?('q_label') ? kwargs['q_label'] : kwargs['q_label'] = 'q'
     dtype = _construct_dtype(*args, **kwargs)
     full = kwargs['full_output'] || false
     arr_flag = false
     psms = nil
 
-    if args.map{ _1.instance_of?(Pandas.DataFrame) }.all?{ _1 }
+    if args.empty?.! && args.map{ _1.is_a?(Pandas.DataFrame) }.all?
       psms = Pandas.concat(args)
       return _qvalues_df(psms, keyf, isdecoy, **kwargs)
     end
 
-    if args.map{ _1.instance_of?(Numpy.ndarray)}.all{ _1 }.!
+    if args.empty?.! && args.map{ _1.instance_of?(Numpy.ndarray)}.all{ _1 }.!
       keyf = Itemgetter.new(keyf) if keyf.instance_of?(String)
       isdecoy = Itemgetter.new(isdecoy) if isdecoy.instance_of?(String)
       peps = Itemgetter.new(peps) if peps.instance_of?(String)
     end
 
-    if defined?(keyf) || defined?(isdecoy)
+    if callable?(keyf) || callable?(isdecoy)
       kwargs.delete('full_output')
-      scores = Numpy.array(get_scores(*args, **kwargs), dtype=dtype)
+      scores = Numpy.array(get_scores(*args, **kwargs), dtype: dtype)
     else
       if args.map{ _1.instance_of?(Numpy.ndarray) }.all?{ _ 1 }
         psms = Numpy.concatenate(args)
@@ -358,33 +358,35 @@ def _make_qvalues(read, is_decoy_prefix, is_decoy_suffix, key)
     scores
   end
 
-  _fix_docstring(qvalues, 'is_decoy' => is_decoy_prefix, 'key' => key)
-  if read == _iter
-    qvalues.__doc__ = qvalues.__doc__.replace(
-      "positional args : file or str
-      Files to read PSMs from. All positional arguments are treated as
-      files.",
-      "positional args : iterables
-      Iterables to read PSMs from. All positional arguments are chained."
-      ).replace(
-      "\n            .. warning::
-      The default function may not work
-      with your files, because format flavours are diverse.
-      decoy_prefix : str, optional
-      If the default `is_decoy` function works for you, this parameter specifies which
-      protein name prefix to use to detect decoy matches. If you provide your own
-      `is_decoy`, or if you specify `decoy_suffix`, this parameter has no effect.
-      Default is `DECOY_`.
-      decoy_suffix : str, optional
-      If the default `is_decoy` function works for you, this parameter specifies which
-      protein name suffix to use to detect decoy matches. If you provide your own
-      `is_decoy`, this parameter has no effect. Mutually exclusive with `decoy_prefix`.\n",
-      "")
+  _fix_docstring(qvalues, 'is_decoy' => @is_decoy_prefix, 'key' => key)
+  if read == @_iter
+    # qvalues.__doc__ = qvalues.__doc__.replace(
+    #   "positional args : file or str
+    #   Files to read PSMs from. All positional arguments are treated as
+    #   files.",
+    #   "positional args : iterables
+    #   Iterables to read PSMs from. All positional arguments are chained."
+    #   ).replace(
+    #   "\n            .. warning::
+    #   The default function may not work
+    #   with your files, because format flavours are diverse.
+    #   decoy_prefix : str, optional
+    #   If the default `is_decoy` function works for you, this parameter specifies which
+    #   protein name prefix to use to detect decoy matches. If you provide your own
+    #   `is_decoy`, or if you specify `decoy_suffix`, this parameter has no effect.
+    #   Default is `DECOY_`.
+    #   decoy_suffix : str, optional
+    #   If the default `is_decoy` function works for you, this parameter specifies which
+    #   protein name suffix to use to detect decoy matches. If you provide your own
+    #   `is_decoy`, this parameter has no effect. Mutually exclusive with `decoy_prefix`.\n",
+    #   "")
   end
-  qvalues
+  @qvalues
 end
 
 def _make_filter(read, is_decoy_prefix, is_decoy_suffix, key, qvalues)
+  @qvalues = qvalues
+  @is_decoy_prefix = is_decoy_prefix
   def filter(*args, **kwargs)
     begin
       fdr = kwargs.delete('fdr')
@@ -392,13 +394,13 @@ def _make_filter(read, is_decoy_prefix, is_decoy_suffix, key, qvalues)
       raise PyteomicsError.new('Keyword argument required: fdr')
     end
 
-    args = args.map{ [Container, Sized].instance_of?(_1.class).! ? arg.to_a : _1 }
+    args = args.map{ sizeable?(_1.class).! && includeable?(_1.class).! ? arg.to_a : _1 }
     peps = kwargs['pep']
     if peps.nil?
       remove_decoy = kwargs.delete('remove_decoy') || true
-      scores = qvalues(*args, remove_decoy=remove_decoy, **kwargs)
+      scores = @qvalues(*args, 'remove_decoy' => remove_decoy, **kwargs)
     else
-      scores = qvalues(*args, **kwargs)
+      scores = @qvalues(*args, **kwargs)
     end
     keyf = kwargs.delete('key') || key
     keyf = peps if keyf.nil?
@@ -410,7 +412,7 @@ def _make_filter(read, is_decoy_prefix, is_decoy_suffix, key, qvalues)
       elsif kwargs.include?('decoy_prefix')
         isdecoy = lambda { |x| is_decoy_prefix(x, kwargs['decoy_prefix']) }
       else
-        isdecoy = is_decoy_prefix
+        isdecoy = @is_decoy_prefix
       end
     else
       isdecoy = kwargs['is_decoy']
@@ -422,14 +424,14 @@ def _make_filter(read, is_decoy_prefix, is_decoy_suffix, key, qvalues)
 
     begin
       i = scores[q_label].searchsorted(fdr, side: 'right')
-      i = i[0] if i.instance_of?(Sized)
+      i = i[0] if sizeable?(i)
     rescue => exception
       i = scores['q'].bsearch_index{ _1 > fdr } || scores['q'].size
     end
     if kwargs.delete('full_output')
       if scores.instance_of?(Pandas.DataFrame)
         return scores.iloc[0..i]
-      elsif defined?(keyf) || defined?(isdecoy)
+      elsif callable?(keyf) || callable?(isdecoy)
         return scores['psm'][0...i]
       else
         return scores[0...i]
@@ -444,12 +446,13 @@ def _make_filter(read, is_decoy_prefix, is_decoy_suffix, key, qvalues)
     end
     cutoff = i < scores.size ? scores[label][i] : scores[label][-1] + [1, -1][reverse == 0 ? 0 : 1]
     def out()
-      f = read(*args, **kwargs)
-      f.zip(scores).each do |p1, s|
-        if peps.nil?.! || remove_decoy.! || s[decoy_or_pep_label].!
-          if better(s[label], cutoff)
-            p1
-            yield
+      File.open(*args) do |f|
+        f.zip(scores).each do |p1, s|
+          if peps.nil?.! || remove_decoy.! || s[decoy_or_pep_label].!
+            if better(s[label], cutoff)
+              p1
+              yield
+            end
           end
         end
       end
@@ -458,7 +461,7 @@ def _make_filter(read, is_decoy_prefix, is_decoy_suffix, key, qvalues)
   end
 
   def _filter(*args, **kwargs)
-    if kwargs.key?('full_output')
+    if kwargs.include?('full_output')
       if [0, '', nil, []].include?(kwargs['full_output']).!
         kwargs.delete('full_output')
         return filter(*args, full_output=True, **kwargs)
@@ -467,28 +470,28 @@ def _make_filter(read, is_decoy_prefix, is_decoy_suffix, key, qvalues)
     return IteratorContextManager.new(*args, parser_func=filter, **kwargs)
   end
 
-  _fix_docstring(_filter, is_decoy: is_decoy_prefix, key: key)
-  if read == _iter
-    _filter.__doc__ = _filter.__doc__.replace(
-      "positional args : file or str
-      Files to read PSMs from. All positional arguments are treated as
-      files.",
-      "positional args : iterables
-      Iterables to read PSMs from. All positional arguments are chained."
-      ).replace(
-      "\n            .. warning::
-      The default function may not work
-      with your files, because format flavours are diverse.
-      decoy_prefix : str, optional
-      If the default `is_decoy` function works for you, this parameter specifies which
-      protein name prefix to use to detect decoy matches. If you provide your own
-      `is_decoy`, or if you specify `decoy_suffix`, this parameter has no effect.
-      Default is `DECOY_`.
-      decoy_suffix : str, optional
-      If the default `is_decoy` function works for you, this parameter specifies which
-      protein name suffix to use to detect decoy matches. If you provide your own
-      `is_decoy`, this parameter has no effect. Mutually exclusive with `decoy_prefix`.\n",
-      "")
+  _fix_docstring(_filter, 'is_decoy' => is_decoy_prefix, 'key' => key)
+  if read == @_iter
+    # _filter.__doc__ = _filter.__doc__.replace(
+    #   "positional args : file or str
+    #   Files to read PSMs from. All positional arguments are treated as
+    #   files.",
+    #   "positional args : iterables
+    #   Iterables to read PSMs from. All positional arguments are chained."
+    #   ).replace(
+    #   "\n            .. warning::
+    #   The default function may not work
+    #   with your files, because format flavours are diverse.
+    #   decoy_prefix : str, optional
+    #   If the default `is_decoy` function works for you, this parameter specifies which
+    #   protein name prefix to use to detect decoy matches. If you provide your own
+    #   `is_decoy`, or if you specify `decoy_suffix`, this parameter has no effect.
+    #   Default is `DECOY_`.
+    #   decoy_suffix : str, optional
+    #   If the default `is_decoy` function works for you, this parameter specifies which
+    #   protein name suffix to use to detect decoy matches. If you provide your own
+    #   `is_decoy`, this parameter has no effect. Mutually exclusive with `decoy_prefix`.\n",
+    #   "")
   end
   _filter
 end
@@ -502,11 +505,10 @@ def _itercontext(x, **kw)
   end
 end
 
-# _iter = ChainBase._make_chain(_itercontext)
-_iter = ''
-qvalues = _make_qvalues(_iter, nil, nil, nil)
+@_iter = ChainBase._make_chain('_itercontext')
+qvalues = _make_qvalues(@_iter, nil, nil, nil)
 
-filter = _make_filter(_iter, nil, nil, nil, qvalues)
+filter = _make_filter(@_iter, nil, nil, nil, qvalues)
 filter.chain = _make_chain(filter, 'filter', true)
 
 begin
@@ -582,14 +584,14 @@ def _count_psms(psms, is_decoy, pep, decoy_prefix, decoy_suffix, is_decoy_prefix
   if is_decoy.instance_of?(String)
     decoy = psms[is_decoy].sum()
     total = psms.shape[0]
-  elsif defined?(is_decoy)
+  elsif callable?(is_decoy)
     psms.each do |psm|
       total += 1
       d = is_decoy(psm)
       decoy += pep.nil?.! ? d : [0, '', nil, []].include?(d) ? 0 : 1
     end
   else
-    if [Sized, Container].include?(is_decoy.class).!
+    if sizeable?(is_decoy.class).! && includeable?(is_decoy.class).!
       is_decoy = is_decoy.to_a
     end
     if !!pep
@@ -624,22 +626,22 @@ def _make_fdr(is_decoy_prefix, is_decoy_suffix)
     return (decoy.to_f + tfalse / ratio) / total
   end
 
-  _fix_docstring(fdr, is_decoy: is_decoy_prefix)
+  _fix_docstring(fdr, 'is_decoy' => is_decoy_prefix)
   if is_decoy_prefix.nil?
-    fdr.__doc__ = fdr.__doc__.replace(
-      "\n            .. warning::
-      The default function may not work
-      with your files, because format flavours are diverse.
-      decoy_prefix : str, optional
-      If the default `is_decoy` function works for you, this parameter specifies which
-      protein name prefix to use to detect decoy matches. If you provide your own
-      `is_decoy`, or if you specify `decoy_suffix`, this parameter has no effect.
-      Default is `DECOY_`.
-      decoy_suffix : str, optional
-      If the default `is_decoy` function works for you, this parameter specifies which
-      protein name suffix to use to detect decoy matches. If you provide your own
-      `is_decoy`, this parameter has no effect. Mutually exclusive with `decoy_prefix`.\n",
-      "")
+    # fdr.__doc__ = fdr.__doc__.replace(
+    #   "\n            .. warning::
+    #   The default function may not work
+    #   with your files, because format flavours are diverse.
+    #   decoy_prefix : str, optional
+    #   If the default `is_decoy` function works for you, this parameter specifies which
+    #   protein name prefix to use to detect decoy matches. If you provide your own
+    #   `is_decoy`, or if you specify `decoy_suffix`, this parameter has no effect.
+    #   Default is `DECOY_`.
+    #   decoy_suffix : str, optional
+    #   If the default `is_decoy` function works for you, this parameter specifies which
+    #   protein name suffix to use to detect decoy matches. If you provide your own
+    #   `is_decoy`, this parameter has no effect. Mutually exclusive with `decoy_prefix`.\n",
+    #   "")
   end
   fdr
 end

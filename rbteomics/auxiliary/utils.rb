@@ -33,6 +33,7 @@ begin
 rescue => exception
   pynumpress = nil  
 end
+require 'set'
 
 def print_tree(d, indent_str=' -> ', indent_count=1)
   def structure(d)
@@ -233,6 +234,51 @@ class Itemgetter
       obj[@item]
     else
       @items.map{ |item| obj[item] }
+    end
+  end
+end
+
+def callable?(obj)
+  if obj.is_a?(Integer)
+    false
+  elsif obj.is_a?(String)
+    false
+  elsif obj.is_a?(Float)
+    false
+  elsif obj.nil?
+    false
+  elsif defined?(obj)
+    true
+  else
+    raise TypeError "#{obj} は未定義のオブジェクトです。"
+  end
+end
+
+def sizeable?(obj)
+  if obj.is_a?(Integer)
+    false
+  elsif obj.nil?
+    false
+  else
+    begin
+      obj.size
+      true
+    rescue => exception
+      obj.method_defined? :size, true
+    end
+  end
+end
+
+def includeable?(obj)
+  if obj.is_a?(Integer)
+    false
+  elsif obj.nil?
+    false
+  else
+    begin
+      obj.include?('') ? true : true
+    rescue => exception
+      obj.method_defined? :include?, true
     end
   end
 end

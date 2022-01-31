@@ -8,6 +8,7 @@
 
 require 'minitest/autorun'
 require_relative '../rbteomics/pepxml'
+require_relative 'data'
 require 'set'
 
 class TestPepxml < Minitest::Test
