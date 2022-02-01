@@ -1,6 +1,6 @@
 require 'set'
 
-_protxml_schema_defaults = {
+Protxml_schema_defaults = {
   'bools' => Set.new,
   'charlists' => Set.new,
   'floatlists' => Set.new,
@@ -176,7 +176,7 @@ _protxml_schema_defaults = {
   ])
 }
    
-_mzid_schema_defaults = {
+Mzid_schema_defaults = {
   'bools' => Set.new([
     ['Enzyme', 'semiSpecific'],
     ['Enzymes', 'independent'],
@@ -266,7 +266,7 @@ _mzid_schema_defaults = {
   ])
 }
    
-_trafoxml_schema_defaults = {
+Trafoxml_schema_defaults = {
   'bools' => Set.new,
   'charlists' => Set.new,
   'floatlists' => Set.new,
@@ -285,7 +285,7 @@ _trafoxml_schema_defaults = {
   ])
 }
    
-_featurexml_schema_defaults = {
+Featurexml_schema_defaults = {
   'ints' => Set.new([
     ['PeptideHit', 'charge'],
     # ['PeptideIdentification', 'spectrum_reference'],
@@ -352,7 +352,7 @@ _featurexml_schema_defaults = {
   ])
 }
    
-_tandem_schema_defaults = {
+Tandem_schema_defaults = {
   'ints' => Set.new([
     ['group', 'z'],
     ['aa', 'at'],
@@ -406,7 +406,7 @@ _tandem_schema_defaults = {
   ])
 }
    
-_mzxml_schema_defaults = {
+Mzxml_schema_defaults = {
   'bools' => Set.new([
     ['dataProcessing', 'centroided'],
     ['dataProcessing', 'chargeDeconvoluted'],
@@ -462,7 +462,7 @@ _mzxml_schema_defaults = {
   ])
 }
    
-_mzml_schema_defaults = {
+Mzml_schema_defaults = {
   'ints' => Set.new([
     ['spectrum', 'index'],
     ['instrumentConfigurationList', 'count'],
@@ -527,7 +527,7 @@ _mzml_schema_defaults = {
   'charlists' => {}
 }
    
-_pepxml_schema_defaults = {
+Pepxml_schema_defaults = {
   'ints' => Set.new([
     ['xpressratio_summary', 'xpress_light'],
     ['distribution_point', 'obs_5_distr'],
@@ -684,7 +684,7 @@ _pepxml_schema_defaults = {
   ])
 }
    
-_traml_schema_defaults = {
+Traml_schema_defaults = {
   'bools' => Set.new,
   'charlists' => Set.new,
   'floatlists' => Set.new,
@@ -721,7 +721,7 @@ _traml_schema_defaults = {
   ])
 }
    
-_idxml_schema_defaults = {
+Idxml_schema_defaults = {
   'ints' => Set.new([
     ['PeptideHit', 'charge'], ['SearchParameters', 'missed_cleavages'],
     ['PeptideHit', 'NumMatchedMainIons'], ['PeptideHit', 'IsotopeError']

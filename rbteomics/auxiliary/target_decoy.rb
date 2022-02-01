@@ -187,7 +187,7 @@ end
 def _make_qvalues(read, is_decoy_prefix, is_decoy_suffix, key)
   @mq_is_decoy_prefix = is_decoy_prefix
   @mq_key = key
-  @qvalues = lambda do |*args, **kwargs|
+  @mqvalues = lambda do |*args, **kwargs|
     #@_keepstate
     def get_scores(*args, **kwargs)
       scores = []
@@ -248,7 +248,7 @@ def _make_qvalues(read, is_decoy_prefix, is_decoy_suffix, key)
       isdecoy = peps
     end
     
-    if callable?(isdecoy).! && sizeable?(keyf.class).! && includeable?(keyf.class).!
+    if callable?(isdecoy).! && sizeable?(isdecoy.class).! && includeable?(isdecoy.class).!
       isdecoy = Numpy.array(isdecoy.to_a)
     end
     remove_decoy = kwargs['remove_decoy'] || false
@@ -358,7 +358,7 @@ def _make_qvalues(read, is_decoy_prefix, is_decoy_suffix, key)
     scores
   end
 
-  _fix_docstring(qvalues, 'is_decoy' => @is_decoy_prefix, 'key' => key)
+  _fix_docstring(@mqvalues, 'is_decoy' => @is_decoy_prefix, 'key' => key)
   if read == @_iter
     # qvalues.__doc__ = qvalues.__doc__.replace(
     #   "positional args : file or str
@@ -381,13 +381,13 @@ def _make_qvalues(read, is_decoy_prefix, is_decoy_suffix, key)
     #   `is_decoy`, this parameter has no effect. Mutually exclusive with `decoy_prefix`.\n",
     #   "")
   end
-  @qvalues
+  @mqvalues
 end
 
 def _make_filter(read, is_decoy_prefix, is_decoy_suffix, key, qvalues)
-  @qvalues = qvalues
+  @mfqvalues = qvalues
   @is_decoy_prefix = is_decoy_prefix
-  def filter(*args, **kwargs)
+  @filter = lambda do |*args, **kwargs|
     begin
       fdr = kwargs.delete('fdr')
     rescue => exception
@@ -398,9 +398,9 @@ def _make_filter(read, is_decoy_prefix, is_decoy_suffix, key, qvalues)
     peps = kwargs['pep']
     if peps.nil?
       remove_decoy = kwargs.delete('remove_decoy') || true
-      scores = @qvalues(*args, 'remove_decoy' => remove_decoy, **kwargs)
+      scores = @mfqvalues.call(*args, 'remove_decoy' => remove_decoy, **kwargs)
     else
-      scores = @qvalues(*args, **kwargs)
+      scores = @mfqvalues.call(*args, **kwargs)
     end
     keyf = kwargs.delete('key') || key
     keyf = peps if keyf.nil?
@@ -460,14 +460,14 @@ def _make_filter(read, is_decoy_prefix, is_decoy_suffix, key, qvalues)
     return out()
   end
 
-  def _filter(*args, **kwargs)
+  _filter = lambda do |*args, **kwargs|
     if kwargs.include?('full_output')
       if [0, '', nil, []].include?(kwargs['full_output']).!
         kwargs.delete('full_output')
-        return filter(*args, full_output=True, **kwargs)
+        return @filter.call(*args, 'full_output' => true, **kwargs)
       end
     end
-    return IteratorContextManager.new(*args, parser_func=filter, **kwargs)
+    return IteratorContextManager.new(*args, 'parser_func' => filter, **kwargs)
   end
 
   _fix_docstring(_filter, 'is_decoy' => is_decoy_prefix, 'key' => key)
@@ -506,10 +506,18 @@ def _itercontext(x, **kw)
 end
 
 @_iter = ChainBase._make_chain('_itercontext')
-qvalues = _make_qvalues(@_iter, nil, nil, nil)
+@qvalues = _make_qvalues(@_iter, nil, nil, nil)
 
-filter = _make_filter(@_iter, nil, nil, nil, qvalues)
-filter.chain = _make_chain(filter, 'filter', true)
+filter = lambda do |x = nil|
+  if x.nil?
+    _make_filter(@_iter, nil, nil, nil, @qvalues)
+  elsif x == 'chain' || x == :chain
+    y = _make_filter(@_iter, nil, nil, nil, @qvalues)
+    _make_chain(y, 'filter', full_output: true)
+  end
+end
+# filter = _make_filter(@_iter, nil, nil, nil, qvalues)
+# filter.chain = _make_chain(filter, 'filter', full_output: true)
 
 begin
   _precalc_fact = Numpy.log((0...20).map{ |m| (1..m).inject(1, :*) })
@@ -605,12 +613,14 @@ def _count_psms(psms, is_decoy, pep, decoy_prefix, decoy_suffix, is_decoy_prefix
 end
 
 def _make_fdr(is_decoy_prefix, is_decoy_suffix)
-  def fdr(psms: nil, formula: 1, is_decoy: nil, ratio: 1, correction: 0, pep: nil, decoy_prefix: 'DECOY_', decoy_suffix: nil)
+  @mf_is_decoy_prefix = is_decoy_prefix
+  @mf_is_decoy_suffix = is_decoy_suffix
+  fdr = lambda do |psms: nil, formula: 1, is_decoy: nil, ratio: 1, correction: 0, pep: nil, decoy_prefix: 'DECOY_', decoy_suffix: nil|
     if [1, 2].include?(formula).!
       raise PyteomicsError.new("'formula' must be either 1 or 2.")
     end
 
-    decoy, total = _count_psms(psms, is_decoy, pep, decoy_prefix, decoy_suffix, is_decoy_prefix, is_decoy_suffix)
+    decoy, total = _count_psms(psms, is_decoy, pep, decoy_prefix, decoy_suffix, @mf_is_decoy_prefix, @mf_is_decoy_suffix)
     return decoy.to_f / total if pep.nil?.!
     tfalse = decoy
     if correction == 1 || (correction == 2 && total.to_f / decoy > 10)

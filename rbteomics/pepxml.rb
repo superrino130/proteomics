@@ -204,20 +204,28 @@ end
 
 Chain = ChainBase._make_chain('read')
 
-_is_decoy_prefix = lambda do |psm, prefix: 'DECOY_'|
+@_is_decoy_prefix = lambda do |psm, prefix: 'DECOY_'|
   psm['search_hit'][0]['proteins'].map{ |protein| protein['protein'].start_with(prefix) }.all?
 end
 
-_is_decoy_suffix = lambda do |psm, suffix: '_DECOY'|
+@_is_decoy_suffix = lambda do |psm, suffix: '_DECOY'|
   psm['search_hit'][0]['proteins'].map{ |protein| protein['protein'].end_with(suffix) }.all?
 end
 
-IS_decoy = _is_decoy_prefix
-FDR = _make_fdr(_is_decoy_prefix, _is_decoy_suffix)
+is_decoy = @_is_decoy_prefix
+fdr = _make_fdr(@_is_decoy_prefix, @_is_decoy_suffix)
 _key = lambda { |x| x['search_hit'].min{ |sh| sh['search_score']['expect'] } }
-Qvalues = _make_qvalues(Chain, _is_decoy_prefix, _is_decoy_suffix, _key)
-Filter = _make_filter(Chain, _is_decoy_prefix, _is_decoy_suffix, _key, Qvalues)
-Filter.chain = _make_chain(Filter, 'filter', true)
+@qvalues = _make_qvalues(Chain, @_is_decoy_prefix, @_is_decoy_suffix, _key)
+filter = lambda do |x = nil|
+  if x.nil?
+    _make_filter(Chain, @_is_decoy_prefix, @_is_decoy_suffix, _key, @qvalues)
+  elsif x == 'chain' || x == :chain
+    y = _make_filter(Chain, @_is_decoy_prefix, @_is_decoy_suffix, _key, @qvalues)
+    _make_chain(y, 'filter', true)
+  end
+end
+# Filter = _make_filter(Chain, _is_decoy_prefix, _is_decoy_suffix, _key, Qvalues)
+# Filter.chain = _make_chain(Filter, 'filter', true)
 
 def DataFrame(*args, **kwargs)
   import Pandas

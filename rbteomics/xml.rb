@@ -102,7 +102,382 @@ class XMLParam
 end
 
 class XML < FileReader
-  # Not started
+  def initialize(...)
+    @file_format = 'XML'
+    @_root_element = nil
+    @_default_schema = {}
+    @_read_schema = false
+    @_default_version = 0
+    @_default_iter_tag = nil
+    @_default_iter_path = nil
+    @_structures_to_flatten = []
+    @_schema_location_param = 'schemaLocation'
+    @_default_id_attr = 'id'
+    @_huge_tree =false
+    @_retrieve_refs_enabled = nil
+    @_iterative = true
+    @_converters = XMLValueConverter.converters()
+    @_element_handlers = {}
+
+    __init__(...)
+  end
+
+  def _get_info_smart(element, **kwargs)
+    raise NotImplementedError
+  end
+
+  def __init___(source, **kwargs)
+    read_schema = kwargs['read_schema'] || nil
+    iterative = kwargs['iterative'] || nil
+    build_id_cache = kwargs['build_id_cache'] || false
+
+    super(source, 'mode' => 'rb', 'parser_func' => iterfind, 'pass_file' => false,
+      'args' => [@_default_iter_path || @_default_iter_tag], 'kwargs' => kwargs)
+    iterative = @_iterative if iterative.nil?
+    if iterative.nil?.!
+      @_tree = nil
+    else
+      build_tree()
+    end
+    if build_id_cache
+      build_id_cache()
+    else
+      @_id_dict = nil
+    end
+
+    @version_info = _get_version_info()
+    if read_schema.nil?.!
+      @_read_schema = read_schema
+    end
+    @schema_info = _get_schema_info(read_schema)
+
+    @_converters_items = @_converters
+    @_huge_tree = kwargs['huge_tree'] || @_huge_tree
+    @_retrieve_refs_enabled = kwargs['retrieve_refs']
+  end
+
+  def __reduce_ex__(protocol)
+    [self.class, [@_source_init, @_read_schema, @_tree.nil?, false], __getstate__()]
+  end
+
+  def __getstate__
+    state = super
+    state['_huge_tree'] = @_huge_tree
+    state['_retrieve_refs_enabled'] = @_retrieve_refs_enabled
+    state['_id_dict'] = @_id_dict
+    state
+  end
+
+  def __setstate__(state)
+    super
+    @_huge_tree = state['_huge_tree']
+    @_retrieve_refs_enabled = state['_retrieve_refs_enabled']
+    @_id_dict = state['_id_dict']
+  end
+
+  #@_keepstate
+  def _get_version_info
+    etree.iterparse(@_source, 'events' => ['start'], 'remove_comments' => true, 'huge_tree' => @_huge_tree).each do |_, elem|
+      if _local_name(elem) == @_root_element
+        return [elem.attrib.get('version'),
+        elem.attrib.get((elem.nsmap.include?('xis') ? '{{{}}}'.format(elem.nsmap['xsi']) : '') + @_schema_location_param)
+      end
+    end
+  end
+
+  #@_keepstate
+  def _get_schema_info(read_schema: true)
+    return @_default_schema if read_schema.!
+
+    version, schema = @version_info
+    return @_default_schema if version == @_default_version
+
+    ret = {}
+    begin
+      if ['', 0, nil, false, [], {}].include?(schema)
+        schema_url = ''
+        raise PyteomicsError.new("Schema information not found in #{@name}.")
+      end
+      schema_url = schema.split[-1]
+      ret = xsd_parser(schema_url)
+    rescue => e
+      if [URLError, socket.error, socket.timeout].include?(e.class)
+        warn "Can't get the #{self.file_format} schema for version `#{@version}` from <#{@schema_url}> at the moment.\nUsing defaults for {0._default_version}.\nYou can disable reading the schema by specifying `read_schema=False`."
+      else
+        warn "Unknown #{self.file_format} version `#{@version}`.\n" +
+          "Attempt to use schema " +
+          "information from <#{schema_url}> failed.\n" +
+          "Exception information:\n#{formt_exc()}\n" +
+          "Falling back to defaults for #{@_default_version}\n" +
+          "NOTE: This is just a warning, probably from a badly-" +
+          "generated XML file.\nYou will still most probably get " +
+          "decent results.\nLook here for suppressing warnings:\n" +
+          "http://docs.python.org/library/warnings.html#" +
+          "temporarily-suppressing-warnings\n" +
+          "You can also disable reading the schema by specifying " +
+          "`read_schema=False`.\n" +
+          "If you think this shouldn't have happened, please " +
+          "report this to\n" +
+          "http://github.com/levitsky/pyteomics/issues\n"
+      end
+      ret = @_default_schema
+    end
+    ret
+  end
+
+  def _handle_param(element, **kwargs)
+    types = {'int' => unitint, 'float' => unitfloat, 'string' => unitstr}
+    attribs = element.attrib
+    unit_info = nil
+    unit_accesssion = nil
+    if attribs.include?('unitCvRef') || attribs.include?('unitName')
+      unit_accesssion = attribs['unitAccession']
+      unit_name = attribs['unitName'] || unit_accesssion
+      unit_info = unit_name
+    end
+    accession = attribs['accession']
+    value = attribs['value'] || ''
+    begin
+      if types.include?(attribs['type'])
+        value = types[attribs['type']](value, unit_info)
+      else
+        value = unitfloat(value, unit_info)
+      end
+    rescue => exception
+      value = unitstr(value, unit_info)
+    end
+    return XMLParam.new(Cvstr.new(attribs['name'], accession, unit_accesssion), value, _local_name(element))
+  end
+
+  def _find_immediate_params(element, **kwargs)
+    return element.xpath('./*[local-name()="cvParam" or local-name()="userParam" or local-name()="UserParam"]')
+  end
+
+  def _insert_param(info_dict, param)
+    key = param.name
+    if info_dict.include?(key)
+      if info_dict[key].is_a?(Array)
+        info_dict[key] << param.value
+      else
+        info_dict[key] = [info_dict[key], param.value]
+      end
+    else
+      info_dict[key] = param.value
+    end
+  end
+
+  def _promote_empty_parameter_to_name(info, params)
+    empty_values = []
+    not_empty_values = []
+    params.each do |param|
+      if param.is_empty()
+        empty_values << param
+      else
+        not_empty_values << param
+      end
+    end
+
+    if empty_values.size == 1 && info.include?('name').!
+      info['name'] = empty_values[0].name
+      return [info, not_empty_values]
+    end
+    [info, params]
+  end
+
+  def _get_info(element, **kwargs)
+    begin
+      name = kwargs.delete('ename')
+    rescue => exception
+      name = _local_name(element)
+    end
+    schema_info = @schema_info
+    if ['cvParam', 'userParam', 'UserParam'].include?(name)
+      return _handle_param(element, **kwargs)
+    end
+
+    info = element.attrib.to_h
+    params = []
+    if kwargs['recursive']
+      element.iterchildren().each do |child|
+        cname = _local_name(child)
+        if ['cvParam', 'userParam', 'UserParam'].include?(cname)
+          newinfo = _handle_param(child, **kwargs)
+          params << newinfo
+        else
+          if schema_info['lists'].include?(cname).!
+            info[cname] = self._get_info_smart(child, ename=cname, **kwargs)
+          else
+            info[cname] = [] if info.include?(cname).!
+            info[cname] << _get_info_smart(child, 'ename' => cname, **kwargs)
+          end
+        end
+      end
+    else
+      _find_immediate_params(element, **kwargs).each do |child|
+        params << _handle_param(child, **kwargs)
+      end
+    end
+
+    handler = @_element_handlers[name]
+    if handler.nil?.!
+      info, params = handler(info, params)
+    end
+
+    params.each do |param|
+      _insert_param(info, param)
+    end
+
+    if element.text
+      stext = element.text.strip
+      if stext
+        if info
+          info[name] = stext
+        else
+          return stext
+        end
+      end
+    end
+
+    begin
+      info.each do |k, v|
+        @_converters_items.each do |t, a|
+          if schema_info.include?(t) && schema_info[t].include?([name, k])
+            info[k] = a(v)
+          end
+        end
+      end
+    rescue => e
+      message = "Error when converting types: #{e.args}"
+      if _read_schema.!
+        message += '\nTry reading the file with read_schema=True'
+      end
+      raise PyteomicsError.new(message)
+    end
+
+    if kwargs['retrieve_refs'] || @_retrieve_refs_enabled
+      _retrieve_refs(info, **kwargs)
+    end
+
+    info.to_h.each do |k, v|
+      if @_structures_to_flatten.include?(k)
+        if v.is_a?(Array)
+          v.each do |vi|
+            info.merge!(vi)
+          end
+        else
+          info.merge!(v)
+        end
+        info.delete(k)
+      end
+    end
+
+    info.to_h.each do |k, v|
+      if v.is_a?(Hash) && v.include?('name') && v.size == 1
+        info[k] = v['name']
+      end
+    end
+    if info.size == 2 && info.include?('name') && (info.include?('value') || info.include?('values'))
+      name = info.delete('name')
+      info = {'name' => info.pop[1]}
+    end
+    info
+  end
+
+  #@_keepstate
+  def build_tree
+    ps = etree.XMLParser(remove_comments: true, huge_tree: true)
+    @_tree = etree.parse(@_source, 'parser' => ps)
+  end
+
+  def clear_tree
+    @_tree = nil
+  end
+
+  def _retrieve_refs(info, **kwargs)
+    raise NotImplementedError("_retrieve_refs is not implemented for #{self.class}. Do not use `retrieve_refs=True`.")
+  end
+
+  def iterfind(path, **kwargs)
+    Iterfind.new(path, **kwargs)
+  end
+
+  #@_keepstate
+  def _iterfind_impl(path, **kwargs)
+    begin
+      m = pattern_path.match(path)
+      path = m[1]
+      tail = m[0].sub(path,'')
+    rescue => exception
+      raise PyteomicsError.new('Invalid path: ' + path)
+    end
+    if path[0...2] == '//' || path[0] != '/'
+      absolute = false
+      if path[0...2] == '//'
+        path = path[2..]
+        if path[0] == '/' || path.include?('//')
+          raise PyteomicsError.new("Too many /'s in a row.")
+        end
+      end
+    else
+      absolute = true
+      path = path[1..]
+    end
+    nodes = path.rstrip('/').split('/')
+    if nodes.!
+      raise PyteomicsError.new('Invalid path: ' + path)
+    end
+
+    if @_tree.!
+      if tail
+        if tail[0] == '['
+          tail = '(.)' + tail
+        else
+          raise PyteomicsError.new('Cannot parse path tail: ' + tail)
+        end
+        xpath = etree.XPath(tail)
+      end
+      localname = nodes[0]
+      found = false
+      etree.iterparse('events' => ['start', 'end'], 'remove_comments' => true, 'huge_tree' => @_huge_tree).each do |ev, elem|
+        name_lc = _local_name(elem)
+        if ev == 'start'
+          if name_lc == localname || localname == '*'
+            found += 1
+          end
+        else
+          if name_lc == localname || localname == '*'
+            if (absolute && elem.getparent().nil?) || absolute.!
+              get_rel_path(elem, nodes[1..]).each do |child|
+                if tail
+                  xpath(child).each do |elem|
+                    info = _get_info_smart(elem, **kwargs)
+                    yield info
+                  end
+                else
+                  info = _get_info_smart(child, **kwargs)
+                  yield info
+                end
+              end
+            end
+            if localname != '*'
+              found -= 1
+            end
+          end
+          if found.!
+            elem.clear
+          end
+        end
+      end
+    else
+      xpath = ( if absolute ? '/' : '//') + nodes.map{ |node| node != '*' ? "*[local-name()='#{node}']" : '*' }.join('/') + tail
+      @_tree.xpath(xpath).each do |elem|
+        info = _get_info_smart(elem, **kwargs)
+        yield info
+      end
+    end
+  end
+
+  
 end
 
 Pattern_path = Regexp.compile('([\w/*]*)(.*)')

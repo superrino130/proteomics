@@ -202,9 +202,7 @@ class FileReader < IteratorContextManager
 
   def __init__(source, **kwargs)
     func = kwargs['parser_func']
-    # super(*kwargs[:args], parser_func: func, **kwargs[:kwargs])
-    # super(*kwargs[:args], parser_func: func, **kwargs[:kwargs])
-    super(kwargs[:args], 'parser_func' => func, **kwargs[:kwargs])
+    super(kwargs['args'], 'parser_func' => func, **kwargs['kwargs'])
     @_pass_file = kwargs['pass_file']
     @_source_init = source
     @_mode = kwargs['mode']
@@ -709,6 +707,7 @@ class HierarchicalOffsetIndex
 end
 
 def _make_chain(reader, readername, full_output: false)
+  @full_output = full_output
   def concat_results(*args, **kwargs)
     results = args.map{ |arg| reader(arg, **kwargs) }
     if args.map{ |a| a.instance_of?(Pandas.DataFrame)}.all?
@@ -745,20 +744,23 @@ def _make_chain(reader, readername, full_output: false)
     yield from_iterable(...)
   end
 
-  def dispatch(...)
-    dispatch_from_iterable(...)
+  dispatch = lambda do |x = nil, *args, **kwargs|
+    if x.nil?
+      @dispatch_from_iterable.call(*args, **kwargs)
+    elsif x == 'from_iterable' || x == :from_iterable
+      @dispatch_from_iterable.call(*args, **kwargs)
+    end
   end
 
-  def dispatch_from_iterable(args, **kwargs)
-    if kwargs['full_output'] || full_output
+  @dispatch_from_iterable = lambda do |*args, **kwargs|
+    if kwargs['full_output'] || @full_output
       return concat_results(*args, **kwargs)
     end
     return _chain(*args, **kwargs)
   end
 
-  dispatch.__doc__ = "Chain :py:func:`#{readername}` for several files. Positional arguments should be file names or file objects. Keyword arguments are passed to the :py:func:`#{readername}` function."
-  dispatch_from_iterable.__doc__ = "Chain :py:func:`#{readername}` for several files. Keyword arguments are passed to the :py:func:`#{readername}` function./nParameters/n----------/nfiles : iterable/n    Iterable of file names or file objects.\n"
-  dispatch.from_iterable = dispatch_from_iterable
+  # dispatch.__doc__ = "Chain :py:func:`#{readername}` for several files. Positional arguments should be file names or file objects. Keyword arguments are passed to the :py:func:`#{readername}` function."
+  # dispatch_from_iterable.__doc__ = "Chain :py:func:`#{readername}` for several files. Keyword arguments are passed to the :py:func:`#{readername}` function./nParameters/n----------/nfiles : iterable/n    Iterable of file names or file objects.\n"
   dispatch
 end
 
