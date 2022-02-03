@@ -28,8 +28,8 @@ class TestMass < Minitest::Test
              5 => [5.0, 1.0]},
     }
 
-    @mass_H = $_nist_mass['H'][0][0]
-    @mass_O = $_nist_mass['O'][0][0]
+    @mass_H = Nist_mass['H'][0][0]
+    @mass_O = Nist_mass['O'][0][0]
     @test_aa_mass = {'X' => 1.0, 'Y' => 2.0, 'Z' => 3.0}
     @random_peptides = (0...10).to_a.map{ (0...20).to_a.map{ 'XYZ'.split('').sample }.join('') }
 

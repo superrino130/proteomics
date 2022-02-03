@@ -21,11 +21,16 @@ class TestPepxml < Minitest::Test
     }
   end
 
-  def testReadPSM
+  def test_ReadPSM
     [true, false].repeated_permutation(2).each do |rs, it|
-      [PepXML.new, read, chain,
-        lambda { |x, **kw| chain }
-      ]
+      # [PepXML].each do |func|
+      # [PepXML.new, read, chain,
+      #   lambda { |x, **kw| chain },
+      #   lambda { |x, **kw| filter.call() }
+      # ].each do |func|
+        r = pep_read(@path, 'read_schema' => rs, 'iterative' => it)
+        assert_equal r, Pepxml_results
+      # end
     end
   end
 end

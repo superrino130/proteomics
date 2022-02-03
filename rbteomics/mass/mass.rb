@@ -20,7 +20,7 @@ require 'set'
 require 'time'
 # from ..xml import xpath
 
-NIST_mass = $_nist_mass.dup
+NIST_mass = Nist_mass.dup
 STD_aa_comp = {}
 STD_ion_comp = {}
 
@@ -474,8 +474,8 @@ def fast_mass2(sequence, ion_type: nil, charge: nil, **kwargs)
 end
 
 class Unimod
-  def initialize(source: 'http://www.unimod.org/xml/unimod.xml')
-    __init__(source)
+  def initialize(...)
+    __init__(...)
   end
 
   def __init__(source: 'http://www.unimod.org/xml/unimod.xml')

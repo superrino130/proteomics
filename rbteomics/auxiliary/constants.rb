@@ -1,6 +1,6 @@
 ### Bulky constants for other modules are defined below.
 
-$_nist_mass = {'Ac' => {0 => [227, 1.0],
+Nist_mass = {'Ac' => {0 => [227, 1.0],
     206 => [206.0145, 0.0],
     207 => [207.01195, 0.0],
     208 => [208.01155, 0.0],

@@ -17,9 +17,10 @@ np = Numpy
 
 require 'set'
 require 'open-uri'
+include Tandem
 
 plt.figure()
 
-tf = tandem_read('example.t.xml')
+tf = read('example.t.xml')
 
 exit

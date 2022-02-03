@@ -211,7 +211,7 @@ Pepxml_results = [
      'spectrum' => '"Cmpd 24, +MSn(1085.6886), 1.2 min.23.23.3"',
      'start_scan' => 23}]
 
-mzid_spectra = {[false, false] => [{'id' => 'SEQ_spec1',
+Mzid_spectra = {[false, false] => [{'id' => 'SEQ_spec1',
                                   'spectraData_ref' => 'LCMALDI_spectra',
                                   'spectrumID' => 'databasekey=1'},
                                  {'id' => 'SEQ_spec2a',

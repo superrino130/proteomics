@@ -5,6 +5,7 @@
 # from contextlib import contextmanager
 # from collections import OrderedDict, defaultdict
 # import json
+require 'json'
 # import multiprocessing as mp
 # import threading
 # import warnings
@@ -202,7 +203,7 @@ class FileReader < IteratorContextManager
 
   def __init__(source, **kwargs)
     func = kwargs['parser_func']
-    super(kwargs['args'], 'parser_func' => func, **kwargs['kwargs'])
+    super(*kwargs['args'], 'parser_func' => func, **kwargs['kwargs'])
     @_pass_file = kwargs['pass_file']
     @_source_init = source
     @_mode = kwargs['mode']
@@ -435,7 +436,7 @@ class IndexedTextReader < FileReader
 
   def __init__(source, **kwargs)
     encoding = kwargs.delete('encoding') || 'utf-8'
-    super(source, mode: 'rb', encoding: nil, **kwargs)
+    super(source, 'mode' => 'rb', 'encoding' => nil, **kwargs)
     @encoding = encoding
     ['delimiter', 'label', 'block_size', 'label_group'].each do |attr|
       if kwargs.include?(attr)
@@ -559,11 +560,11 @@ def _file_reader(_mode: 'r')
     # @wraps(_func)
     def helper(*args, **kwargs)
       if args
-        return FileReader.new(args[0], mode: _mode, parser_func: _func, pass_file: true, args: args[1..-1], kwargs: kwargs,
-          encoding: kwargs.delete('encoding') || nil)
+        return FileReader.new(args[0], 'mode' => @_mode, 'parser_func' => @_func, 'pass_file' => true, 'args' => args[1..], 'kwargs' => kwargs,
+          'encoding' => kwargs.delete('encoding') || nil)
       end
       source = kwargs.delete('source') || nil
-      FileReader.new(source, mode: _mode, parser_func: _func, pass_file: true, args: [], kwargs: kwargs, encoding: kwargs.delete('encoding') || nil)
+      FileReader.new(source, 'mode' => @_mode, 'parser_func' => @_func, 'pass_file' => true, 'args' => [], 'kwargs' => kwargs, 'encoding' => kwargs.delete('encoding') || nil)
     end
     helper
   end
@@ -578,17 +579,147 @@ def _file_writer(_mode: 'a')
 end
 
 module WritableIndex
-  # Not started
+  Schema_version = [1, 0, 0]
+  Schema_version_tag_key = "@pyteomics_schema_version"
+
+  def _serializable_container
+    {'index' => self.constants}
+  end
+
+  def save(fp)
+    container = _serializable_container
+    container[Schema_version_tag_key] = Schema_version
+    JSON.dump(container, fp)
+  end
+
+  def self.load(cls, fp)
+    container = json.load(fp)
+    version_tag = container[@_schema_version_tag_key]
+    if version_tag.nil?
+      inst = cls
+      inst.Schema_version = nil
+      return inst
+    end
+    version_tag = [version_tag]
+    index = container['index']
+    if version_tag < cls.Schema_version
+      inst = cls(index)
+      inst.Schema_version = version_tag
+      return inst
+    end
+    return cls(index)
+  end
 end
 
-# class OffsetIndex < OrderedDict
 class OffsetIndex < Hash
   include WritableIndex
 
+  def initialize(...)
+    __init__(...)
+  end
+
+  def __init__(*args, **kwargs)
+    super
+    @_index_sequence = nil
+  end
+
+  def _invalidate
+    @_index_sequence = nil
+  end
+
+  #@property
+  def index_sequence
+    if @_index_sequence.nil?
+      @_index_sequence = [self.items()]
+    end
+    @_index_sequence
+  end
+
+  def __setitem__(key, value)
+    _invalidate()
+    return super
+  end
+
+  def pop(*args, **kwargs)
+    _invalidate()
+    return super
+  end
+
+  def find(key, *args, **kwargs)
+    return self[key]
+  end
+
+  def from_index(index, include_value: false)
+    items = @index_sequence
+    if include_value
+      items[index]
+    else
+      items[index][0]
+    end
+  end
+
+  def from_slice(spec, include_value: false)
+    items = @index_sequence
+    items[spec].map{ |k, v| include_value ? [k, v] : k }
+  end
+
+  def between(start, stop, include_value: false)
+    keys = self.keys
+    if start.nil?.!
+      begin
+        start_index = keys.index(start)
+      rescue => exception
+        raise KeyError start
+      end
+    else
+      start_index = 0
+    end
+    if stop.nil?.!
+      begin
+        stop_index = keys.index(stop)
+      rescue => exception
+        raise KeyError stop
+      end
+    else
+      stop_index = len(keys) - 1
+    end
+    if start.nil? || stop.nil?
+      #pass  # won't switch indices
+    else
+      start_index, stop_index = [start_index, stop_index].min, [start_index, stop_index].max
+    end
+
+    if include_value
+      return keys[start_index...stop_index + 1].map{ |k| [k, self[k]] }
+    end
+    return keys[start_index...stop_index + 1]
+  end
+
+  def __repr__
+    "#{self.class}(#{self.to_a})"
+  end
+
+  def _integrity_check
+    indices = self.values
+    sorted_indices = self.values.sort
+    indices == sorted_indices
+  end
+
+  def sort
+    sorted_pairs = self.sort_by{ |_, v| v }
+    self.clear
+    self._invalidate()
+    sorted_pairs.each do |key, value|
+      self[key] = value
+    end
+    return self
+  end
 end
 
 class IndexSavingTextReader < IndexedTextReader
   prepend IndexSavingMixin
+
+  # Not started
 end
 
 class HierarchicalOffsetIndex
@@ -827,12 +958,12 @@ end
 
 begin
   require 'etc'
-  _NPROC = Etc.nprocessers  
+  NPROC = Etc.nprocessers  
 rescue => exception
-  _NPROC = 4
+  NPROC = 4
 end
-_QUEUE_TIMEOUT = 4
-_QUEUE_SIZE = 1e7.to_i
+QUEUE_TIMEOUT = 4
+QUEUE_SIZE = 1e7.to_i
 
 class TaskMappingMixin
   include NoOpBaseReader
@@ -841,9 +972,9 @@ class TaskMappingMixin
   end
 
   def __init__(*args, **kwargs)
-    @_queue_size = kwargs.delete('queue_size', _QUEUE_SIZE)
-    @_queue_timeout = kwargs.delete('timeout', _QUEUE_TIMEOUT)
-    @_nproc = kwargs.delete('processes', _NPROC)
+    @_queue_size = kwargs.delete('queue_size') || QUEUE_SIZE
+    @_queue_timeout = kwargs.delete('timeout') || QUEUE_TIMEOUT
+    @_nproc = kwargs.delete('processes') || NPROC
     super
   end
 

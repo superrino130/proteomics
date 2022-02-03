@@ -14,11 +14,11 @@ class PepXML
   #class MultiProcessingXML(IndexedXML, TaskMappingMixin):
   #class IndexSavingXML(IndexSavingMixin, IndexedXML):
 
-  def initialize
+  def initialize(source, **kwargs)
     @_index_class = HierarchicalOffsetIndex.new
     @file_format = 'pepXML'
     @_root_element = 'msms_pipeline_analysis'
-    @_default_schema = _schema_defaults._pepxml_schema_defaults
+    @_default_schema = Pepxml_schema_defaults
     @_default_version = '1.15'
     @_default_iter_tag = 'spectrum_query'
     @_indexed_tags = Set.new(['spectrum_query'])
@@ -33,8 +33,8 @@ class PepXML
       'floatarray' => Set.new(['all_ntt_prob'])
     }
 
-    @mpx = MultiProcessingXML.new
-    @isx = IndexSavingXML.new
+    @mpx = MultiProcessingXML.new(*args, **kwargs)
+    @isx = IndexSavingXML.new(source, *args, **kwargs)
   end
 
   # # from class IndexSavingXML
@@ -166,10 +166,10 @@ class PepXML
   end
 end
 
-def read(source, **kwargs)
+def pep_read(source, **kwargs)
   read_schema = kwargs['read_schema'] || false
   iterative = kwargs['iterative'] ||  true
-  PepXML.new(source, read_schema: read_schema, iterative: iterative)
+  PepXML.new(source, 'read_schema' => read_schema, 'iterative' => iterative)
 end
 
 def iterfind(source, path, **kwargs)

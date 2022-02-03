@@ -24,12 +24,12 @@ end
 class FASTA < FileReader
   include FASTABase
 
-  def initialize(source, ignore_comments: false, parser: nil, encoding: nil)
-    __init__(source, ignore_comments: false, parser: nil, encoding: nil)
+  def initialize(...)
+    __init__(...)
   end
 
   def __init__(source, ignore_comments: false, parser: nil, encoding: nil)
-    super(source, mode: 'r', parser_func: @_read, pass_file: false, args: (), kwargs: {},
-    encoding: encoding, ignore_comments: ignore_comments, parser: parser)
+    super(source, 'mode' => 'r', 'parser_func' => @_read, 'pass_file' => false, 'args' => [], 'kwargs' => {},
+      'encoding' => encoding, 'ignore_comments' => ignore_comments, 'parser' => parser)
   end
 end
