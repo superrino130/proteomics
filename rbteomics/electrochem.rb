@@ -217,7 +217,7 @@ def pI(sequence, pI_range: [0.0, 14.0], precision_pI: 0.01, **kwargs)
     pK_nterm = kwargs['pK_nterm'] || {}
     pK_cterm = kwargs['pK_cterm'] || {}
   elsif sequence.instance_of?(Hash) && (kwargs.include?('pK_nterm') || kwargs.include?('pK_cterm'))
-    raise PyteomicsError("Can not use terminal features for #{sequence}")
+    raise PyteomicsError.new("Can not use terminal features for #{sequence}")
   end
   peptide_dict, pK = _prepare_charge_dict(sequence, **{'pK' => pK, 'pK_cterm' => pK_cterm, 'pK_nterm' => pK_nterm})
   left_x, right_x = pI_range
@@ -244,6 +244,6 @@ def gravy(sequence, hydropathicity: Hydropathicity_KD)
   begin
     return sequence.map{hydropathicity[_1]}.sum / sequence.size
   rescue => exception
-    raise PyteomicsError("Hydropathicity for amino acid {} not provided.".format(e.args[0]))    
+    raise PyteomicsError.new("Hydropathicity for amino acid {} not provided.".format(e.args[0]))    
   end
 end

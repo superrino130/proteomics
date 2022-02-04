@@ -67,12 +67,12 @@ def calculate_RT(peptide, rc_dict, raise_no_mod: true)
   peptide_dict.each_key do |aa|
     if rc_dict['aa'].include?(aa).!
       if aa.size == 1
-        raise PyteomicsError("No RC for residue '#{aa}'")
+        raise PyteomicsError.new("No RC for residue '#{aa}'")
       end
       if ['', 0, nil, false, [], {}].include?(raise_no_mod).! && rc_dict['aa'].include?(aa[-1])
         rt += peptide_dict[aa] * rc_dict['aa'][aa[-1]]
       else
-        raise PyteomicsError(
+        raise PyteomicsError.new(
           "Residue '#{aa}' not found in RC_dict. Set raise_no_mod=False to ignore this error and use the RC for '#{aa[-1]} instead.")
       end
     else

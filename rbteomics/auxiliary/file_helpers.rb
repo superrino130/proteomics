@@ -611,7 +611,7 @@ module WritableIndex
   end
 end
 
-class OffsetIndex < Hash
+class OffsetIndex
   include WritableIndex
 
   def initialize(...)
@@ -619,7 +619,30 @@ class OffsetIndex < Hash
   end
 
   def __init__(*args, **kwargs)
-    super
+    @hash = {}
+    if args.empty?.!
+      if args.size == 1 && args[0].is_a?(String)
+        args[0].split('').each do |s|
+          @hash[s] = 1
+        end
+      else
+        args.each do |x|
+          if x.is_a?(Array)
+            x.each do |y|
+              if y.is_a?(Array)
+                @hash[y[0]] = y[1]
+              else
+                @hash[y] = 1
+              end
+            end
+          else
+            @hash[x] = 1
+          end
+        end
+      end
+    elsif kwargs.empty?.!
+      @hash.merge!(kwargs)
+    end
     @_index_sequence = nil
   end
 
@@ -630,7 +653,7 @@ class OffsetIndex < Hash
   #@property
   def index_sequence
     if @_index_sequence.nil?
-      @_index_sequence = [self.items()]
+      @_index_sequence = @hash.to_a
     end
     @_index_sequence
   end
@@ -646,11 +669,11 @@ class OffsetIndex < Hash
   end
 
   def find(key, *args, **kwargs)
-    return self[key]
+    return @hash[key]
   end
 
   def from_index(index, include_value: false)
-    items = @index_sequence
+    items = @hash.sort
     if include_value
       items[index]
     else
@@ -659,12 +682,12 @@ class OffsetIndex < Hash
   end
 
   def from_slice(spec, include_value: false)
-    items = @index_sequence
+    items = @hash.sort
     items[spec].map{ |k, v| include_value ? [k, v] : k }
   end
 
   def between(start, stop, include_value: false)
-    keys = self.keys
+    keys = @hash.keys.sort
     if start.nil?.!
       begin
         start_index = keys.index(start)
@@ -681,7 +704,7 @@ class OffsetIndex < Hash
         raise KeyError stop
       end
     else
-      stop_index = len(keys) - 1
+      stop_index = keys.size - 1
     end
     if start.nil? || stop.nil?
       #pass  # won't switch indices
@@ -690,7 +713,7 @@ class OffsetIndex < Hash
     end
 
     if include_value
-      return keys[start_index...stop_index + 1].map{ |k| [k, self[k]] }
+      return keys[start_index...stop_index + 1].map{ |k| [k, @hash[k]] }
     end
     return keys[start_index...stop_index + 1]
   end

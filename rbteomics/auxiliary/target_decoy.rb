@@ -31,12 +31,12 @@ require 'set'
 module Target_decoy
   module_function
   def _fix_docstring(f, **defaults)
-    defaults.each do |argname, v|
-      if v.nil?.!
+    # defaults.each do |argname, v|
+    #   if v.nil?.!
         # f.__doc__ = re.sub('{} : .*'.format(argname),
         #                          lambda m: m.group() + ', optional', f.__doc__)
-      end
-    end
+    #   end
+    # end
   end
   
   def _calculate_qvalues(scores, isdecoy, **kwargs)
@@ -59,7 +59,7 @@ module Target_decoy
       if correction.instance_of?(Integer)
         if correction == 1
           tfalse += 1
-        elsif
+        elsif correction == 2
           ps = 1.0 / (1.0 + ratio)
           targ = ind - cumsum
           tfalse.size.times do |i|
@@ -82,7 +82,7 @@ module Target_decoy
       end
     end
   
-    (scores.size - 1...0).each do |i|
+    (scores.size - 1).dowto(1) do |i|
       if scores[i] == scores[i - 1] || q[i - 1] > q[i]
         q[i - 1] = q[i]
       end
@@ -97,9 +97,9 @@ module Target_decoy
     decoy_or_pep_label = _decoy_or_pep_label(**kwargs)
     q_label = kwargs.include?('q_label') ? kwargs['q_label'] : kwargs['q_label'] = 'q'
     score_label = kwargs.include?('score_label') ? kwargs['score_label'] : kwargs['score_label'] = 'score'
-    keyf = psms.apply(keyf, axis: 1) if callable?(keyf)
-    isdecoy = psms.apply(isdecoy, axis: 1) if callable?(isdecoy)
-    if keyf.instance_of?(String)
+    keyf = psms.apply(keyf, axis: 1).to_a if callable?(keyf)
+    isdecoy = psms.apply(isdecoy, axis: 1).to_a if callable?(isdecoy)
+    if keyf.instance_of?(BaseString)
       if psms.shape[0]
         psms[score_label] = keyf
       else
@@ -107,7 +107,7 @@ module Target_decoy
       end
       keyf = kwargs['score_label']
     end
-    if isdecoy.instance_of?(String)
+    if isdecoy.instance_of?(BaseString)
       if psms.shape[0]
         psms[decoy_or_pep_label] = isdecoy
       else
@@ -473,7 +473,7 @@ module Target_decoy
     end
   
     _fix_docstring(_filter, 'is_decoy' => is_decoy_prefix, 'key' => key)
-    if read == @_iter
+    # if read == @_iter
       # _filter.__doc__ = _filter.__doc__.replace(
       #   "positional args : file or str
       #   Files to read PSMs from. All positional arguments are treated as
@@ -494,7 +494,7 @@ module Target_decoy
       #   protein name suffix to use to detect decoy matches. If you provide your own
       #   `is_decoy`, this parameter has no effect. Mutually exclusive with `decoy_prefix`.\n",
       #   "")
-    end
+    # end
     _filter
   end
   
@@ -593,13 +593,13 @@ module Target_decoy
         is_decoy = lambda { |x| is_decoy_prefix(x, decoy_prefix) }
       end
     end
-    if is_decoy.instance_of?(String)
+    if is_decoy.instance_of?(BaseString)
       decoy = psms[is_decoy].sum()
       total = psms.shape[0]
     elsif callable?(is_decoy)
       psms.each do |psm|
         total += 1
-        d = is_decoy(psm)
+        d = is_decoy.call(psm)
         decoy += pep.nil?.! ? d : [0, '', nil, []].include?(d) ? 0 : 1
       end
     else
@@ -616,10 +616,17 @@ module Target_decoy
     [decoy, total]
   end
   
-  def _make_fdr(is_decoy_prefix, is_decoy_suffix)
+  _make_fdr = lambda do |is_decoy_prefix, is_decoy_suffix|
     @mf_is_decoy_prefix = is_decoy_prefix
     @mf_is_decoy_suffix = is_decoy_suffix
-    fdr = lambda do |psms: nil, formula: 1, is_decoy: nil, ratio: 1, correction: 0, pep: nil, decoy_prefix: 'DECOY_', decoy_suffix: nil|
+    fdr = lambda do |psms, **kwargs|
+      formula = kwargs['formula'] || 1
+      is_decoy = kwargs['is_decoy'] || nil
+      ratio = kwargs['ratio'] || 1
+      correction = kwargs['correction'] ||  0
+      pep = kwargs['pep'] || nil
+      decoy_prefix = kwargs['decoy_prefix'] || 'DECOY_'
+      decoy_suffix = kwargs['decoy_suffix'] || nil
       if [1, 2].include?(formula).!
         raise PyteomicsError.new("'formula' must be either 1 or 2.")
       end
@@ -641,7 +648,7 @@ module Target_decoy
     end
   
     _fix_docstring(fdr, 'is_decoy' => is_decoy_prefix)
-    if is_decoy_prefix.nil?
+    # if is_decoy_prefix.nil?
       # fdr.__doc__ = fdr.__doc__.replace(
       #   "\n            .. warning::
       #   The default function may not work
@@ -656,11 +663,11 @@ module Target_decoy
       #   protein name suffix to use to detect decoy matches. If you provide your own
       #   `is_decoy`, this parameter has no effect. Mutually exclusive with `decoy_prefix`.\n",
       #   "")
-    end
+    # end
     fdr
   end
   
-  fdr = _make_fdr(nil, nil)
+  Fdr = _make_fdr.call(nil, nil)
   
   def _sigma_T(decoy, ratio)
     Math.sqrt((decoy + 1) * (ratio + 1) / (ratio * ratio).to_f)

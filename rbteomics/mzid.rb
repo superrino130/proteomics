@@ -79,9 +79,9 @@ module MZID
     # Not started
   end
   
-  fdr = _make_fdr(@is_decoy, nil)
+  fdr = Target_decoy._make_fdr(@is_decoy, nil)
   @_key = lambda { |x| x['SpectrumIdentificationItem'].min{ |sii| sii['mascot:expectation value'] } }
-  @qvalues = _make_qvalues(Chain, @is_decoy, nil, @_key)
+  @qvalues = Target_decoy._make_qvalues(Chain, @is_decoy, nil, @_key)
   filter = lambda do |x = nil|
     if x.nil?
       _make_filter(Chain, @is_decoy, nil, @_key, @qvalues)

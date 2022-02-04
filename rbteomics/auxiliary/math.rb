@@ -2,15 +2,15 @@ require_relative './structures'
 require 'numpy'
 
 def linear_regression_vertical(x, y: nil, a: nil, b: nil)
-  x = Numpy.array(x, copy=nil)
-  if y
-    y = Numpy.array(y, copy=nil)
+  x = Numpy.array(x, copy: nil)
+  if y.nil?.!
+    y = Numpy.array(y, copy: nil)
   else
-    if x.shape.size != 2 || x.shape[-1] != 2
-      raise PyteomicsError("f `y` is not given, x.shape should be (N, 2), given: #{x.shape}")
+    if x.shape.to_a.size != 2 || x.shape[-1] != 2
+      raise PyteomicsError.new("If `y` is not given, x.shape should be (N, 2), given: #{x.shape}")
     end
-    y = x[0..-1, 1] # 本当は[:,1]
-    x = x[0..-1, 0] # 本当は[:,0]
+    y = x[0..-1, 1]
+    x = x[0..-1, 0]
   end
   if !!a && !b
     b = (y - a * x).mean()
@@ -33,19 +33,19 @@ end
 
 def linear_regression_perpendicular(x, y: nil)
   x = Numpy.array(x, copy: nil)
-  if !!y
+  if y.nil?.!
     y = Numpy.array(y, copy: nil)
     data = Numpy.hstack([x.reshape([-1, 1]), y.reshape([-1, 1])])
   else
-    if x.shape.size != 2 || x.shape[-1] != 2
-      raise PyteomicsError("If `y` is not given, x.shape should be (N, 2), given: #{x.shape}")
+    if x.shape.to_a.size != 2 || x.shape[-1] != 2
+      return raise PyteomicsError.new("If `y` is not given, x.shape should be (N, 2), given: #{x.shape}")
     end
     data = x
   end
-  mu = data.mean(axis=0)
-  eigenvectors, eigenvalues, v = Numpy.linalg.svd((data - mu).T, full_matrices=false)
+  mu = data.mean(axis: 0).to_a
+  eigenvectors, eigenvalues, v = Numpy.linalg.svd((data - mu).T, full_matrices: false)
   a = eigenvectors[0][1] / eigenvectors[0][0]
-  xm, ym = data.mean(axis=0)
+  xm, ym = data.mean(axis: 0).to_a
   b = ym - a * xm
 
   r = Numpy.corrcoef(data[0..-1, 0], data[0..-1, 1])[0, 1]

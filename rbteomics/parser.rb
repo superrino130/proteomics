@@ -590,7 +590,7 @@ def isoforms(sequence, **kwargs)
   elsif format_ == 'str'
     return @possible_states.map{ tostring(_1, show_unmodified_termini: @show_unmodified_termini) }
   else
-    raise PyteomicsError("Unsupported value of 'format': #{format_}")
+    raise PyteomicsError.new("Unsupported value of 'format': #{format_}")
   end
 end
 
