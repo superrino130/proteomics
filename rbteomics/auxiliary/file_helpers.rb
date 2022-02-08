@@ -169,9 +169,9 @@ class IteratorContextManager
 
   def reset
     begin
-      @_reader = _func(*self._args, **self._kwargs)
+      @_reader = @_func.call(*@_args, **@_kwargs)
     rescue => exception
-      __exit__(*sys.exc_info())
+      # __exit__(*sys.exc_info())
       raise "Error in IteratorContextManager"
     end
   end
@@ -921,26 +921,32 @@ end
 def _check_use_index(source, use_index, default)
   begin
     if use_index.nil?.!
-      use_index = ['', 0, false, [], {}].include?(use_index) ? false : true
+      use_index = ['', 0, nil, false, [], {}].include?(use_index).!
     end
 
-    if source.is_a?(BaseString)
-      return (use_index.nil?.! ? use_index : default)
+    begin
+      f = File.open(source)
+    rescue => exception
+      if source.is_a?(BaseString)
+        return (use_index.nil?.! ? use_index : default)
+      end        
     end
 
-    if source.respond_to?(:seekable)
-      seekable = source.seekable()
+    begin
+      File.open(source) do |f|
+        @seekable = f.methods.include?(:seek)
+      end
+    rescue => exception
+      @seekable = nil
+    end
+
+    if f.read.encoding == Encoding::ASCII_8BIT
+      binary = true
     else
-      seekable = nil
+      binary = false
     end
 
-    if source.respond_to?(:mode)
-      binary = source.mode.include?('b')
-    else
-      binary = nil
-    end
-
-    if seekable == false
+    if @seekable == false
       if binary
         raise PyteomicsError.new("Cannot work with non-seekable file in binary mode: #{source}.")
       end
@@ -967,7 +973,7 @@ def _check_use_index(source, use_index, default)
       raise
     else
       if use_index.nil?
-        warnings.warn('Could not check mode on {}. Reason: {!r}. Specify `use_index` explicitly to avoid errors.'.format(source, e))
+        warn "Could not check mode on #{source}. Reason: #{exception.message}. Specify `use_index` explicitly to avoid errors."
         return default
       end
       return use_index

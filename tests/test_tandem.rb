@@ -13,7 +13,7 @@ class TestTandem < Minitest::Test
   end
 
   def test_df
-    df = DataFrame(@path)
+    df = Tandem.dataframe(@path)
     assert_equal df.shape, [1, 29]
   end
 end

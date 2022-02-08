@@ -119,9 +119,9 @@ module Target_decoy
   
     if full.!
       if peps.nil?
-        fields = [[keyf, Numpy.float64], [isdecoy, Numpy.bool_], [q_label, Numpy.float64]]
+        fields = [PyCall::Tuple.([keyf, Numpy.float64]), PyCall::Tuple.([isdecoy, Numpy.bool_]), PyCall::Tuple.([q_label, Numpy.float64])]
       else
-        fields = [[isdecoy, Numpy.float64], [q_label, Numpy.float64]]
+        fields = [PyCall::Tuple.([isdecoy, Numpy.float64]), PyCall::Tuple.([q_label, Numpy.float64])]
       end
       dtype = Numpy.dtype(fields)
     end
@@ -166,9 +166,9 @@ module Target_decoy
     score_label = kwargs.include?('score_label') ? kwargs['score_label'] : kwargs['score_label'] = 'score'
   
     fields = [
-      [score_label, Numpy.float64],
-      [_decoy_or_pep_label(**kwargs), peps.nil? ? Numpy.bool_ : Numpy.float64],
-      [q_label, Numpy.float64]
+      PyCall::Tuple.([score_label, Numpy.float64]),
+      PyCall::Tuple.([_decoy_or_pep_label(**kwargs), peps.nil? ? Numpy.bool_ : Numpy.float64]),
+      PyCall::Tuple.([q_label, Numpy.float64])
     ]
     
     if full
@@ -179,14 +179,14 @@ module Target_decoy
       else
         psm_dtype = Numpy.object_
       end
-      dtype = Numpy.dtype(fields + [['psm', psm_dtype]])
+      dtype = Numpy.dtype(fields + PyCall::Tuple.(['psm', psm_dtype]))
     else
       dtype = Numpy.dtype(fields)
     end
     dtype
   end
   
-  def _make_qvalues(read, is_decoy_prefix, is_decoy_suffix, key)
+  Make_qvalues = lambda do |read, is_decoy_prefix, is_decoy_suffix, key|
     @mq_is_decoy_prefix = is_decoy_prefix
     @mq_key = key
     @mqvalues = lambda do |*args, **kwargs|
@@ -339,8 +339,8 @@ module Target_decoy
               psms[label] = scores[label]
             end
           end
-          newdt = fields.map{ [_1, psms.dtype.fields[_1][0]] } + 
-            extra.map{ [_1, Numpy.float64] } + [q_label, Numpy.float64]
+          newdt = fields.map{ PyCall::Tuple.([_1, psms.dtype.fields[_1][0]]) } + 
+            extra.map{ PyCall::Tuple.([_1, Numpy.float64]) } + PyCall::Tuple.([q_label, Numpy.float64])
           psms_ = psms
           psms = Numpy.empty_like(psms_, dtype: newdt)
           fields.each do |f|
@@ -386,17 +386,15 @@ module Target_decoy
     @mqvalues
   end
   
-  def _make_filter(read, is_decoy_prefix, is_decoy_suffix, key, qvalues)
+  Make_filter = lambda do |read, is_decoy_prefix, is_decoy_suffix, key, qvalues|
     @mfqvalues = qvalues
     @is_decoy_prefix = is_decoy_prefix
-    @filter = lambda do |*args, **kwargs|
-      begin
-        fdr = kwargs.delete('fdr')
-      rescue => exception
+    filter = lambda do |*args, **kwargs|
+      if kwargs.include?('fdr').!
         raise PyteomicsError.new('Keyword argument required: fdr')
       end
   
-      args = args.map{ sizeable?(_1.class).! && includeable?(_1.class).! ? arg.to_a : _1 }
+      args = args.map{ |arg| sizeable?(arg.class).! && includeable?(arg.class).! ? arg.to_a : arg }
       peps = kwargs['pep']
       if peps.nil?
         remove_decoy = kwargs.delete('remove_decoy') || true
@@ -407,7 +405,7 @@ module Target_decoy
       keyf = kwargs.delete('key') || key
       keyf = peps if keyf.nil?
       reverse = kwargs.delete('reverse') || false
-      better = [op.lt, op.gt][reverse == 0 ? 0 : 1]
+      better = [op.lt, op.gt][reverse == false ? 0 : 1]
       if kwargs.include?('is_decoy').!
         if kwargs.include?('decoy_suffix')
           isdecoy = lambda { |x| is_decoy_suffix(x, kwargs['decoy_suffix']) }
@@ -508,19 +506,27 @@ module Target_decoy
   end
   
   @_iter = ChainBase._make_chain('_itercontext')
-  def qvalues(read = @_iter, key: nil, is_decoy: nil, remove_decoy: nil)
-    @qvalues = _make_qvalues(read, key, is_decoy, remove_decoy)
-  end
-  
-  filter = lambda do |x = nil|
+  # def qvalues(read = @_iter, key: nil, is_decoy: nil, remove_decoy: nil)
+  #   @qvalues = _make_qvalues(read, key, is_decoy, remove_decoy)
+  # end
+  Qvalues = Make_qvalues.call(@_iter, nil, nil, nil)
+  # Filter = lambda do |x = nil|
+  #   if x.nil?
+  #     _make_filter.call(@_iter, nil, nil, nil, qvalues)
+  #   elsif x == 'chain' || x == :chain
+  #     y = _make_filter.call(@_iter, nil, nil, nil, qvalues)
+  #     _make_chain(y, 'filter', full_output: true)
+  #   end
+  # end
+  Filter = lambda do |x = nil|
     if x.nil?
-      _make_filter(@_iter, nil, nil, nil, qvalues)
+      Make_filter.call(@_iter, nil, nil, nil, Qvalues)
     elsif x == 'chain' || x == :chain
-      y = _make_filter(@_iter, nil, nil, nil, qvalues)
-      _make_chain(y, 'filter', full_output: true)
+      y = Make_filter.call(@_iter, nil, nil, nil, Qvalues)
+      Male_chain(y, 'filter', 'full_output' => true)
     end
-  end
-  # filter = _make_filter(@_iter, nil, nil, nil, qvalues)
+  end  
+  # filter = _make_filter.call(@_iter, nil, nil, nil, qvalues)
   # filter.chain = _make_chain(filter, 'filter', full_output: true)
   
   begin
@@ -600,23 +606,27 @@ module Target_decoy
       psms.each do |psm|
         total += 1
         d = is_decoy.call(psm)
-        decoy += pep.nil?.! ? d : [0, '', nil, []].include?(d) ? 0 : 1
+        decoy += pep.nil?.! ? d : [0, '', nil, false, []].include?(d) ? 0 : 1
       end
     else
       if sizeable?(is_decoy.class).! && includeable?(is_decoy.class).!
         is_decoy = is_decoy.to_a
       end
-      if !!pep
+      if pep.nil?.!
         decoy = is_decoy.sum
       else
-        decoy = is_decoy.select{ _1 != 0 }.size
+        decoy = is_decoy.select{ ['', 0, nil, false].include?(_1).! }.size
       end
-      total = is_decoy.size
+      if is_decoy.is_a?(Enumerator)
+        total = is_decoy.map{}.size
+      else
+        total = is_decoy.size
+      end
     end
     [decoy, total]
   end
   
-  _make_fdr = lambda do |is_decoy_prefix, is_decoy_suffix|
+  Make_fdr = lambda do |is_decoy_prefix, is_decoy_suffix|
     @mf_is_decoy_prefix = is_decoy_prefix
     @mf_is_decoy_suffix = is_decoy_suffix
     fdr = lambda do |psms, **kwargs|
@@ -643,7 +653,7 @@ module Target_decoy
         p = 1 / (1.0 + ratio)
         tfalse = _confidence_value(correction, decoy, total - decoy, p)
       end
-      tfalse.to_f / (total - decoy) / ratio if formula == 1
+      return tfalse.to_f / (total - decoy) / ratio if formula == 1
       return (decoy.to_f + tfalse / ratio) / total
     end
   
@@ -667,18 +677,18 @@ module Target_decoy
     fdr
   end
   
-  Fdr = _make_fdr.call(nil, nil)
+  Fdr = Make_fdr.call(nil, nil)
   
   def _sigma_T(decoy, ratio)
     Math.sqrt((decoy + 1) * (ratio + 1) / (ratio * ratio).to_f)
   end
   
-  def sigma_T(psms, is_decoy, ratio: 1)
+  def sigma_T(psms, is_decoy: nil, ratio: 1)
     decoy, total = _count_psms(psms, is_decoy, nil, nil, nil, nil, nil)
     _sigma_T(decoy, ratio)
   end
   
-  def sigma_fdr(psms: nil, formula: 1, is_decoy: nil, ratio: 1)
+  def sigma_fdr(psms, formula: 1, is_decoy: nil, ratio: 1)
     if [1, 2].include?(formula).!
       raise PyteomicsError.new("'formula' must be either 1 or 2.")
     end

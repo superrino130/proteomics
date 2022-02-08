@@ -7,6 +7,7 @@ require_relative '../rbteomics/auxiliary/utils'
 require_relative '../rbteomics/auxiliary/target_decoy'
 
 module Tandem
+  module_function
   class TandemXML < XML::XML
     def initialize(...)
       __init__(...)
@@ -118,8 +119,8 @@ module Tandem
   end
   
   is_decoy = @_is_decoy_prefix
-  @qvalues = Target_decoy._make_qvalues(TD_chain, @_is_decoy_prefix, @_is_decoy_suffix, Itemgetter.new('expect'))
-  fdr = Target_decoy._make_fdr(@_is_decoy_prefix, @_is_decoy_suffix)
+  @qvalues = Target_decoy::Make_qvalues.call(TD_chain, @_is_decoy_prefix, @_is_decoy_suffix, Itemgetter.new('expect'))
+  fdr = Target_decoy::Make_fdr.call(@_is_decoy_prefix, @_is_decoy_suffix)
   filter = lambda do |x = nil|
     if x.nil?
       _make_filter(TD_chain, @_is_decoy_prefix, @_is_decoy_suffix, Itemgetter.new('expect'), @qvalues)
@@ -137,7 +138,7 @@ module Tandem
     pep_keys = ['id', 'pre', 'post', 'start', 'end']
     sep = kwargs.delete('sep') || nil
     pd_kwargs = kwargs.delete('pd_kwargs') || {}
-    f = TD_chain(*args, **kwargs)
+    f = TD_chain.new(*args, **kwargs)
     f.each do |item|
       info = {}
       item.each do |k, v|

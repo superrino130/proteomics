@@ -76,3 +76,8 @@ plt.show()
 + test_electrochem.rb
 + test_parser.rb
 + test_mass.rb(残り2)
++ test_auxiliary_fdr
++ test_auxiliary_offsetindex
++ test_auxiliary_regression
++ test_auxiliary_useindex
++ test_auxiliary_version

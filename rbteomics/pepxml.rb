@@ -213,7 +213,7 @@ end
 end
 
 is_decoy = @_is_decoy_prefix
-fdr = Target_decoy._make_fdr(@_is_decoy_prefix, @_is_decoy_suffix)
+fdr = Target_decoy._make_fdr.call(@_is_decoy_prefix, @_is_decoy_suffix)
 _key = lambda { |x| x['search_hit'].min{ |sh| sh['search_score']['expect'] } }
 @qvalues = Target_decoy._make_qvalues(Chain, @_is_decoy_prefix, @_is_decoy_suffix, _key)
 filter = lambda do |x = nil|

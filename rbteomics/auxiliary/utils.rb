@@ -245,6 +245,10 @@ def callable?(obj)
     false
   elsif obj.is_a?(Float)
     false
+  elsif obj.is_a?(Enumerator)
+    false
+  elsif obj.is_a?(Array)
+    false
   elsif obj.nil?
     false
   elsif defined?(obj)
@@ -259,6 +263,8 @@ def sizeable?(obj)
     false
   elsif obj.nil?
     false
+  elsif obj.ancestors.include?(Enumerator)
+    true
   else
     begin
       obj.size
