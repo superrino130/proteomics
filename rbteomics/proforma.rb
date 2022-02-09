@@ -119,22 +119,22 @@ module Proforma
   class TagBase
     attr_reader :type, :value, :extra, :group_id
 
+    @@prefix_name = nil
+    @@short_prefix = nil
+    @@prefix_map = {}
+
     def initialize(...)
       __init__(...)
     end
 
     def __init__(type, value, extra: nil, group_id: nil)
-      @prefix_name = nil
-      @short_prefix = nil
-      @prefix_map = {}
-
       @type = type
       @value = value
       @extra = extra
       @group_id = group_id
     end
 
-    def __str__
+    def to_s
       part = self._format_main()
       if @extra
         rest = @extra.map { |e| e.to_s }
@@ -148,11 +148,11 @@ module Proforma
       return label.to_s
     end
 
-    def __repr__
+    def inspect
       "#{self.class}(#{@value.inspect}, #{@extra.inspect}, #{@group_id.inspect})"
     end
 
-    def __eq__(other)
+    def ==(other)
       if other.nil?
         return false
       end
@@ -162,7 +162,7 @@ module Proforma
       (@type == other.class) && (@value == other.value) && (@extra == other.extra) && (@group_id == other.group_id)
     end
   
-    def __ne__(other)
+    def !=(other)
       self != other
     end
 
@@ -183,12 +183,12 @@ module Proforma
     end
 
     def self.parse(buffer)
-      process_tag_tokens(buffer)
+      Proforma.process_tag_tokens(buffer)
     end
   end
 
   class GroupLabelBase < TagBase
-    def __str__
+    def to_s
       part = _format_main
       if @extra.empty?.!
         rest = @extra.map{ |e| e.to_s }
@@ -212,7 +212,7 @@ module Proforma
     end
 
     def _format_main
-      "#{self.group_id}"
+      "#{@group_id}"
     end
   end
 
@@ -233,12 +233,13 @@ module Proforma
   end
 
   class InformationTag < TagBase
+    @@prefix_name = 'INFO'
+
     def initialize(...)
       __init__(...)
     end
 
     def __init__(value, extra: nil, group_id: nil)
-      @prefix_name = 'INFO'
       super(TagTypeEnum.info, value.to_s, extra, group_id)
     end
 
@@ -250,6 +251,8 @@ module Proforma
   class MassModification < TagBase
     attr_reader :_significant_figures
 
+    @@prefix_name = "Obs"
+    
     def initialize(...)
       __init__(...)
     end
@@ -265,10 +268,10 @@ module Proforma
     end
 
     def _format_main
-      if @value >= 0:
-        sprintf("+%#.#{@_significant_figures}", @value).gsub(/0+$/, '').gsub(/.+$/, '')
+      if @value >= 0
+        sprintf("+%#.#{@_significant_figures}f", @value).gsub(/0+$/, '').gsub(/.+$/, '')
       else
-        sprintf("%#.#{@_significant_figures}", @value).gsub(/0+$/, '').gsub(/.+$/, '')
+        sprintf("%#.#{@_significant_figures}f", @value).gsub(/0+$/, '').gsub(/.+$/, '')
       end
     end
 
@@ -312,39 +315,666 @@ module Proforma
       resolve(**kwargs)
     end
   end
+
   class UnimodResolver < ModificationResolver
-  
-  
-  
+    def initialize(...)
+      __init__(...)
+    end
+
+    def __init__(**kwargs)
+      super("unimod", **kwargs)
+      @_database = kwargs["database"]
+      @strict = kwargs["strict"] || true
+    end
+
+    def load_database
+      Unimod.new
+    end
+
+    def resolve(**kwargs)
+      name = kwargs['name'] || nil
+      id = kwargs['id'] || nil
+
+      strict = kwargs["strict"] || @strict
+      exhaustive = kwargs["exhaustive"] || true
+      if name.nil?.!
+        defn = @database.by_title(name, strict: strict)
+        if defn.!
+          defn = @database.by_name(name, strict: strict)
+        end
+        if defn.! && exhaustive && strict
+          defn = @database.by_title(name, strict: false)
+          if defn.!
+            defn = @database.by_name(name, strict: False)
+          end
+        end
+        if defn && defn.instance_of?(Array)
+          warn "Multiple matches found for #{name.inspect} in Unimod, taking the first, #{defn[0]['record_id']}."
+          defn = defn[0]
+        end
+        if defn.!
+          raise KeyError(name)
+        end
+      elsif id.nil?.!
+        defn = database.by_id(id)
+        if defn.!
+          raise KeyError(id)
+        end
+      else
+        raise ValueError("Must provide one of `name` or `id`")
+      end
+      return {
+          'composition' => defn['composition'],
+          'name' => defn['title'],
+          'id' => defn['record_id'],
+          'mass' => defn['mono_mass'],
+          'provider' => @name
+      }
+    end
   end
-  class PSIModResolver < ModificationResolver;end
-  class XLMODResolver < ModificationResolver;end
-  class GNOResolver < ModificationResolver;end
-  class GenericResolver < ModificationResolver;end
-  class ModificationBase < TagBase;end
-  class FormulaModification < ModificationBase;end
-  class GlycanModification < ModificationBase;end
-  class UnimodModification < ModificationBase;end
-  class PSIModModification < ModificationBase;end
-  class GNOmeModification < ModificationBase;end
-  class XLMODModification < ModificationBase;end
-  class GenericModification < ModificationBase;end
-  def split_tags(tokens);end
-  def find_prefix(tokens);end
-  def process_marker(tokens);end
-  def process_tag_tokens(tokens);end
+
+  class PSIModResolver < ModificationResolver
+    def initialize(...)
+      __init__(...)
+    end
+
+    def __init__(**kwargs)
+      super('psimod', **kwargs)
+      @_database = kwargs["database"]
+    end
+
+    def load_database
+      load_psimod()
+    end
+
+    def resolve(**kwargs)
+      name = kwargs['name'] || nil
+      id = kwargs['id'] || nil 
+      if name.nil?.!
+        defn = @database[name]
+      elsif id.nil?.!
+        defn = @database[sprintf("MOD:%#.#5d", id)]
+      else
+        raise ValueError("Must provide one of `name` or `id`")
+      end
+      mass = defn.DiffMono.to_f
+      composition = Composition.new(defn.DiffFormula.strip.replace(" ", ''))
+      return {
+          'mass' => mass,
+          'composition' => composition,
+          'name' => defn.name,
+          'id' => defn.id,
+          'provider' => @name
+      }
+    end
+  end
+
+  class XLMODResolver < ModificationResolver
+    def initialize(...)
+      __init__(...)
+    end
+
+    def __init__(**kwargs)
+      super('xlmod', **kwargs)
+      @_database = kwargs["database"]
+    end
+
+    def load_database
+      load_xlmod()
+    end
+
+    def resolve(**kwargs)
+      name = kwargs['name'] || nil
+      id = kwargs['id'] || nil 
+      if name.nil?.!
+        defn = @database[name]
+      elsif id.nil?.!
+        defn = @database[sprintf("XLMOD:%#.#5d", id)]
+      else
+        raise ValueError("Must provide one of `name` or `id`")
+      end
+      mass = defn['monoIsotopicMass'].to_f
+      if defn.include?('deadEndFormula')
+        composition = Composition.new(defn['deadEndFormula'].replace(" ", '').replace("D", "H[2]"))
+      elsif defn.include?('bridgeFormula')
+        composition = Composition.new(defn['bridgeFormula'].replace(" ", '').replace("D", "H[2]"))
+      end
+      return {
+          'mass' => mass,
+          'composition' => composition,
+          'name' => defn.name,
+          'id' => defn.id,
+          'provider' => @name
+      }
+    end
+  end
+
+  class GNOResolver < ModificationResolver
+    @@mass_pattern = Regexp.compile("(\d+(:?\.\d+)) Da")
+
+    def initialize(...)
+      __init__(...)
+    end
+
+    def __init__(**kwargs)
+      super('gnome', **kwargs)
+      @_database = kwargs["database"]
+    end
+
+    def load_database
+      load_gno()
+    end
+
+    def get_mass_from_glycan_composition(term)
+      val = term['GNO:00000202']
+      monosaccharides = BasicComposition.new()
+      composition = Composition.new()
+      if val != ''
+        tokens = val.scan(/([A-Za-z0-9]+)\((\d+)\)/)
+        mass = 0.0
+        tokens.each do |symbol, count|
+          count = count.to_i
+          begin
+            mono_mass, mono_comp = GlycanModification.valid_monosaccharides[symbol]
+            mass += mono_mass * count
+            composition += mono_comp * count
+            monosaccharides[symbol] += count        
+          rescue => exception
+            next if exception.instance_of?(KeyError)
+          end
+        end
+        return [mass, monosaccharides, composition]
+      end
+      return [nil, nil, nil]
+    end
+  end
+
+  class GenericResolver < ModificationResolver
+    def initialize(...)
+      __init__(...)
+    end
+
+    def __init__(resolvers, **kwargs)
+      super('generic', **kwargs)
+      @resolvers = resolvers.to_a
+    end
+
+    def load_database
+      nil
+    end
+
+    def resolve(**kwargs)
+      name = kwargs['name'] || nil
+      id = kwargs['id'] || nil
+      defn = nil
+      @resolvers.each do |resolver|
+        begin
+          defn = resolver('name' => name, 'id' => id, **kwargs)          
+        rescue => exception
+          next if exception.instance_of?(KeyError)          
+        end
+      end
+      if defn.nil?
+        if name.nil?
+          raise KeyError(id)
+        elsif id.nil?
+          raise KeyError(name)
+        else
+          raise ValueError("Must provide one of `name` or `id`")
+        end
+      end
+      defn
+    end
+  end
+
+  class ModificationBase < TagBase
+    attr_reader :_definition
+
+    @@_tag_type = nil
+
+    def initialize(...)
+      __init__(...)
+    end
+
+    def __init__(value, extra: nil, group_id: nil)
+      super(@@_tag_type, value, extra: extra, group_id: group_id)
+      @_definition = nil
+    end
+  
+    #@property
+    def definition
+      if @_definition.nil?
+        @_definition = resolve()
+      end
+      @_definition
+    end
+
+    #@property
+    def mass
+      @definition['mass']
+    end
+
+    #@property
+    def composition
+      @definition['composition']
+    end
+
+    #@property
+    def id
+      @definition['id']
+    end
+
+    #@property
+    def name
+      @definition['name']
+    end
+
+    #@property
+    def provider
+      @definition['provider']
+    end
+
+    def _populate_from_definition(definition)
+      @_definition = definition
+    end
+
+    def _format_main
+      "#{self.prefix_name}:#{self.value}"
+    end
+
+    def _parse_identifier
+      tokens = value.split(":", 2)
+      if tokens.size > 1
+        value = tokens[1]
+      else
+        value = @value
+      end
+      if value.isdigit()
+        id = value.to_i
+        name = nil
+      else
+        name = value
+        id = nil
+      end
+      return [name, id]
+    end
+
+    def resolve
+      keys = _parse_identifier()
+      resolver(*keys)
+    end
+  end
+
+  class FormulaModification < ModificationBase
+    @@prefix_name = "Formula"
+
+    def initialize(...)
+      __init__(...)
+    end
+
+    def __init__(value,  extra: nil, group_id: nil)
+      @isotope_pattern = Regexp.compile('\[(?P<isotope>\d+)(?P<element>[A-Z][a-z]*)(?P<quantity>[\-+]?\d+)\]')
+      @_tag_type = TagTypeEnum.formula
+      super
+    end
+
+    def _normalize_isotope_notation(match)
+      parts = match.groupdict()
+      "#{parts['element']}[#{parts['isotope']}]#{parts['quantity']}"
+    end
+
+    def resolve
+      normalized = @value.replace(' ', '')
+      if normalized.include?('[')
+        normalized = isotope_pattern.sub(@_normalize_isotope_notation, normalized)
+      end
+      composition = Composition.new('formula' => normalized)
+      return {
+          "mass" => composition.mass(),
+          "composition" => composition,
+          "name" => @value
+      }
+    end
+  end
+
+  class GlycanModification < ModificationBase
+    @@prefix_name = "Glycan"
+
+
+    def initialize(...)
+      __init__(...)
+    end
+
+    def __init__(value,  extra: nil, group_id: nil)
+      @_tag_type = TagTypeEnum.glycan
+  
+      @valid_monosaccharides = {
+          "Hex" => [162.0528, Composition.new("C6H10O5")],
+          "HexNAc" => [203.0793, Composition.new("C8H13N1O5")],
+          "HexS" => [242.009, Composition.new("C6H10O8S1")],
+          "HexP" => [242.0191, Composition.new("C6H11O8P1")],
+          "HexNAcS" => [283.0361, Composition.new("C8H13N1O8S1")],
+          "dHex" => [146.0579, Composition.new("C6H10O4")],
+          "NeuAc" => [291.0954, Composition.new("C11H17N1O8")],
+          "NeuGc" => [307.0903, Composition.new("C11H17N1O9")],
+          "Pen" => [132.0422, Composition.new("C5H8O4")],
+          "Pent" => [132.0422, Composition.new("C5H8O4")],
+          "Fuc" => [146.0579, Composition.new("C6H10O4")]
+      }
+  
+      @tokenizer = Regexp.compile("([A-Za-z]+)\s*(\d*)\s*")
+      @monomer_tokenizer = Regexp.compile(valid_monosaccharides.keys.sort_by{ |x| -x.size }.join('|'))
+      super
+    end
+
+    #@property
+    def monosaccharides
+      @definition['monosaccharides']
+    end
+
+    def resolve
+      composite = BasicComposition.new()
+      @value.scan(@tokenizer).each do |tok, cnt|
+        if [0, '', nil, false, [], {}].include?(cnt).!
+          cnt = cnt.to_i
+        else
+          cnt = 1
+        end
+        if @valid_monosaccharides.include?(tok).!
+          parts = tok.scan(@monomer_tokenizer)
+          t = 0
+          parts.each do |ps|
+            break if @valid_monosaccharides.include?(ps).!
+            t += ps.size
+          end
+          if t != tok.size
+            raise ValueError("#{tok.inspect} is not a valid monosaccharide name")
+          else
+            parts[0...-1].each do |ps|
+              composite[ps] += 1
+            end
+            composite[parts[-1]] += cnt
+          end
+        else
+          composite[tok] += cnt
+        end
+      end
+      mass = 0
+      chemcomp = Composition.new()
+      composite.each do |key, cnt|
+        m, c = @valid_monosaccharides[key]
+        mass += m * cnt
+        chemcomp += c * cnt
+      end
+      return {
+          "mass" => mass,
+          "composition" => chemcomp,
+          "name" => @value,
+          "monosaccharides" => composite
+      }
+    end
+  end
+
+  class UnimodModification < ModificationBase
+    @@resolver = UnimodResolver.new()
+
+    @@prefix_name = "UNIMOD"
+    @@short_prefix = "U"
+    @@_tag_type = TagTypeEnum.unimod
+
+    def self.resolver
+      @@resolver
+    end
+  end
+
+  class PSIModModification < ModificationBase
+    @@resolver = PSIModResolver.new()
+
+    @@prefix_name = "MOD"
+    @@short_prefix = 'M'
+    @@_tag_type = TagTypeEnum.psimod
+
+    def self.resolver
+      @@resolver
+    end
+  end
+
+  class GNOmeModification < ModificationBase
+    @@resolver = GNOResolver.new()
+
+    @@prefix_name = "GNO"
+    @@short_prefix = 'G'
+    @@_tag_type = TagTypeEnum.gnome
+
+    def self.resolver
+      @@resolver
+    end
+
+    #@property
+    def monosaccharides
+      @definition['monosaccharides']
+    end
+  end
+
+  class XLMODModification < ModificationBase
+    @@resolver = XLMODResolver.new()
+
+    @@prefix_name = "XLMOD"
+    # short_prefix = 'XL'
+    @@_tag_type = TagTypeEnum.xlmod
+
+    def self.resolver
+      @@resolver
+    end
+  end
+
+  class GenericModification < ModificationBase
+    @@_tag_type = TagTypeEnum.generic
+    # @@resolver = GenericResolver.new([
+    #       partial(UnimodModification.resolver, exhaustive: false),
+    #       PSIModModification.resolver,
+    #       XLMODModification.resolver,
+    #       GNOmeModification.resolver,
+    #       partial(UnimodModification.resolver, strict: false)
+    # ])
+
+    def self.resolver
+      @@resolver
+    end
+
+    def _format_main
+      @value
+    end
+
+    def resolve
+      keys = _parse_identifier()
+      defn = nil
+      begin
+        defn = UnimodModification.resolver(*keys)
+      rescue => exception
+        if exception.instance_of?(KeyError)
+          # PASS
+        end
+      end
+      if defn.nil?.!
+        return defn
+      end
+      raise KeyError(keys)
+    end
+  end
+
+  def split_tags(tokens)
+    starts = [0]
+    ends = []
+    tokens.each_with_index do |c, i|
+      if c == '|'
+        ends << i
+        starts << i + 1
+      elsif i != 0 && c == '#'
+        ends << i
+        starts << i
+      end
+    end
+    ends << tokens.size
+    out = []
+    starts.each_with_index do |start, i|
+      _end = ends[i]
+      tag = tokens[start..._end]
+      next if tag.size == 0
+      out << tag
+    end
+    out
+  end
+
+  def find_prefix(tokens)
+    tokens.each_with_index do |c, i|
+      if c == ':'
+        return [tokens[0...i].join(''), tokens[i + 1..].join('')]
+      end
+    end
+    [nil, tokens.join('')]
+  end
+
+  def process_marker(tokens)
+    if tokens[1...3] == 'XL'
+      return PositionLabelTag.new(nil, group_id: tokens.join(''))
+    else
+      group_id = None
+      value = None
+      tokens.each_with_index do |c, i|
+        if c == '('
+          group_id = tokens[0...i].join('')
+          if tokens[-1] != ')'
+            raise Exception("Localization marker with score missing closing parenthesis")
+          end
+          value = tokens[i + 1...-1].join('').to_f
+          return LocalizationMarker.new(value, group_id: group_id)
+        else
+          group_id = ''.join(tokens)
+          return PositionLabelTag.new(group_id: group_id)
+        end
+      end
+    end
+  end
+
+  def process_tag_tokens(tokens)
+    parts = split_tags(tokens)
+    main_tag = parts[0]
+    if ['+', '-'].include?(main_tag[0])
+      main_tag = ''.join(main_tag)
+      main_tag = MassModification.new(main_tag)
+    elsif main_tag[0] == '#'
+      main_tag = process_marker(main_tag)
+    else
+      prefix, value = find_prefix(main_tag)
+      if prefix.nil?
+        main_tag = GenericModification.new(value)
+      else
+        tag_type = TagBase.new(self.class, value).find_by_tag(prefix)
+        main_tag = tag_type(value)
+      end
+    end
+    if parts.size > 1
+      extras = []
+      parts[1..].each do |part|
+        prefix, value = find_prefix(part)
+        if prefix.nil?
+          if value[0] == "#"
+            marker = process_marker(value)
+            if marker.instance_of?(PositionLabelTag)
+              main_tag.group_id = value
+            else
+              main_tag.group_id = marker.group_id
+              extras << marker
+            end
+          else
+            extras << GenericModification.new(value.join(''))
+          end
+        else
+          tag_type = TagBase.new.find_by_tag(prefix)
+          extras << tag_type(value)
+        end
+      end
+      main_tag.extra = extras
+    end
+    main_tag
+  end
+
   class ModificationRule
-      # Not started
+    attr_reader :modification_tag, :targets
 
+    def initialize(...)
+      __init__(...)
+    end
+
+    def __init__(modification_tag, targets: nil)
+      @modification_tag = modification_tag
+      @targets = targets
+    end
+
+    def ==(other)
+      return false if other.nil?
+      @modification_tag == other.modification_tag && @targets == other.targets
+    end
+
+    def !=(other)
+      self != other
+    end
+
+    def to_s
+      "<[#{@modification_tag}]@#{@targets.join(',')}>"
+    end
+
+    def inspect
+      "#{self.class}(#{@modification_tag.inspect}, #{@targets})"
+    end
   end
+
   class StableIsotope
-      # Not started
+    attr_reader :isotope
 
-  end
-  class IntersectionEnum < Enumerator
-      # Not started
+    def initialize(...)
+      __init__(...)
+    end
+
+    def __init__(isotope)
+      @isotope = isotope
+    end
+
+    def ==(other)
+      return false if other.nil?
+      @isotope == other.isotope
+    end
+
+    def !=(other)
+      self != other
+    end
+
+    def to_s
+      "<#{@isotope}>"
+    end
+
+    def inspect
+      "#{self.class}(#{@isotope})"
+    end
   end
 
+  intersectionenum = Struct.new(
+    :no_overlap,
+    :full_contains_interval,
+    :full_contained_in_interval,
+    :start_overlap,
+    :end_overlap
+  )
+
+  IntersectionEnum = intersectionenum.new(
+    no_overlap = 0,
+    full_contains_interval = 1,
+    full_contained_in_interval = 2,
+    start_overlap = 3,
+    end_overlap = 4
+  )
+  
   class TaggedInterval
     attr_reader :start, :_end, :tags, :ambiguous
 
@@ -457,8 +1087,35 @@ module Proforma
   end
 
   class ChargeState
-      # Not started
+    attr_reader :charge, :adducts
+
+    def initialize(...)
+      __init__(...)
+    end
+
+    def __init__(charge, adducts: nil)
+      if adducts.nil?
+        adducts = []
+      end
+      @charge = charge
+      @adducts = adducts
+    end
+
+    def to_s
+      tokens = [@charge.to_s]
+      if adducts.empty?.!
+        tokens << "["
+        tokens << @adducts.map{ |adduct| adduct.to_s }.join(',')
+        tokens << "]"
+      end
+      tokens.join('')
+    end
+
+    def inspect
+      "#{self.class}(#{@charge}, #{@adducts})"
+    end
   end
+
   class TokenBuffer
     def initialize(...)
       __init__(...)
@@ -469,7 +1126,7 @@ module Proforma
       @boundaries = []
     end
 
-    def append(c)
+    def <<(c)
       @buffer << c
     end
 
@@ -482,7 +1139,7 @@ module Proforma
       end
     end
 
-    def __bool__
+    def bool
       [0, '', nil, false, [], {}].include?(@buffer).!
     end
 
@@ -490,11 +1147,11 @@ module Proforma
       @buffer.to_enum
     end
 
-    def __getitem__(i)
+    def [](i)
       @buffer[i]
     end
 
-    def __len__
+    def size
       @buffer.size
     end
 
@@ -514,7 +1171,7 @@ module Proforma
     end
 
     def process
-      if @boundaries
+      if [0, '', nil, false, [], {}].include?(@boundaries).!
         value = tokenize.map{ |v| _transform(v) }
       else
         value = _transform(@buffer)
@@ -539,8 +1196,11 @@ module Proforma
       value.join('').to_i
     end
   end
+
   class StringParser < TokenBuffer
-    # Not started
+    def _transform(value)
+      value.join('')
+    end
   end
 
   class TagParser < TokenBuffer
@@ -558,7 +1218,7 @@ module Proforma
     end
 
     def _transform(value)
-      tag = process_tag_tokens(value)
+      tag = Proforma.process_tag_tokens(value)
       if tag.group_id
         @group_ids << tag.group_id
       end
@@ -708,12 +1368,12 @@ module Proforma
         end
         if VALID_AA.include?(c)
           if current_aa.nil?.!
-            positions << [[current_aa, current_tag  ? current_tag() : nil]]
+            positions << [current_aa, current_tag.bool ? current_tag.process : nil]
           end
           current_aa = c
         elsif c == '['
           state = TAG
-          if current_tag
+          if current_tag.bool
             current_tag.bound()
           end
           depth = 1
@@ -724,7 +1384,7 @@ module Proforma
           current_interval = TaggedInterval.new(positions.size + 1)
           state = INTERVAL_INIT
         elsif c == ')'
-          positions << [[current_aa, current_tag ? current_tag() : None]]
+          positions << [current_aa, current_tag.bool ? current_tag.process : nil]
           current_aa = nil
           if current_interval.nil?
             raise ProFormaError.new("Error In State #{state}, unexpected #{c} found at index #{i}")
@@ -743,17 +1403,18 @@ module Proforma
           state = TAG_AFTER
           if i >= n || sequence[i] != '['
             raise ProFormaError.new("Missing Closing Tag")
-            i += 1
-            depth = 1
-          elsif c == '/'
-            state = CHARGE_START
-            charge_buffer = NumberParser.new()
-          elsif c == '+'
-            raise ProFormaError.new("Error In State #{state}, #{c} found at index #{i}. Chimeric representation not supported")
-          else
-            raise ProFormaError.new("Error In State #{state}, unexpected #{c} found at index #{i}")
           end
-        elsif state == TAG || state == TAG_BEFORE || state == TAG_AFTER || state == GLOBAL || state == INTERVAL_TAG
+          i += 1
+          depth = 1
+        elsif c == '/'
+          state = CHARGE_START
+          charge_buffer = NumberParser.new()
+        elsif c == '+'
+          raise ProFormaError.new("Error In State #{state}, #{c} found at index #{i}. Chimeric representation not supported")
+        else
+          raise ProFormaError.new("Error In State #{state}, unexpected #{c} found at index #{i}")
+        end
+      elsif state == TAG || state == TAG_BEFORE || state == TAG_AFTER || state == GLOBAL || state == INTERVAL_TAG
           if c == '['
             depth += 1
             current_tag << c
@@ -766,7 +1427,7 @@ module Proforma
               elsif state == TAG_BEFORE
                 state = POST_TAG_BEFORE
               elsif state == TAG_AFTER
-                c_term = current_tag()
+                c_term = current_tag.process
                 state = POST_TAG_AFTER
               elsif state == GLOBAL
                 state = POST_GLOBAL
@@ -780,7 +1441,7 @@ module Proforma
           else
             current_tag << c
           end
-        elsif state == FIXED
+      elsif state == FIXED
           if c == '['
             state = GLOBAL
           else
@@ -788,34 +1449,34 @@ module Proforma
             current_tag.reset()
             current_tag << c
           end
-        elsif state == ISOTOPE
+      elsif state == ISOTOPE
           if c != '>'
             current_tag << c
           else
-            isotopes << StableIsotope.new(current_tag.join(''))
+            isotopes << StableIsotope.new(current_tag.process.join(''))
             current_tag.reset()
             state = BEFORE
           end
-        elsif state == LABILE
+      elsif state == LABILE
           if c == '{'
             depth += 1
           elsif c == '}'
             depth -= 1
             if depth <= 0
               depth = 0
-              labile_modifications << current_tag()[0]
+              labile_modifications << current_tag.process[0]
               state = BEFORE
             end
           else
-            current_tag.append(c)
+            current_tag << c
           end
-        elsif state == POST_INTERVAL_TAG
+      elsif state == POST_INTERVAL_TAG
           if c == '['
             current_tag.bound()
             state = INTERVAL_TAG
           elsif VALID_AA.include?(c)
             current_aa = c
-            current_interval.tags = current_tag()
+            current_interval.tags = current_tag.process
             intervals << current_interval
             current_interval = nil
             state = SEQ
@@ -834,32 +1495,32 @@ module Proforma
           else
             raise ProFormaError.new("Error In State #{state}, unexpected #{c} found at index #{i}")
           end
-        elsif state == POST_TAG_BEFORE
+      elsif state == POST_TAG_BEFORE
           if c == '?'
-            unlocalized_modifications << current_tag()[0]
+            unlocalized_modifications << current_tag.process[0]
             state = BEFORE
           elsif c == '-'
-            n_term = current_tag()
+            n_term = current_tag.process
             state = BEFORE
           elsif c == '^'
             state = UNLOCALIZED_COUNT
           else
             raise ProFormaError.new("Error In State #{state}, unexpected #{c} found at index #{i}")
           end
-        elsif state == UNLOCALIZED_COUNT
-          if c.isdigit()
+      elsif state == UNLOCALIZED_COUNT
+          if c.match(/[0-9]/)
             current_unlocalized_count << c
           elsif c == '['
               state = TAG_BEFORE
               depth = 1
-              tag = current_tag()[0]
+              tag = current_tag.process[0]
               multiplicity = current_unlocalized_count()
               multiplicity.times do |i|
                 unlocalized_modifications << tag
               end
           elsif c == '?'
               state = BEFORE
-              tag = current_tag()[0]
+              tag = current_tag.process[0]
               multiplicity = current_unlocalized_count()
               multiplicity.times do |i|
                 unlocalized_modifications << tag
@@ -867,35 +1528,35 @@ module Proforma
           else
               raise ProFormaError.new("Error In State #{state}, unexpected #{c} found at index #{i}")
           end
-        elsif state == POST_GLOBAL
+      elsif state == POST_GLOBAL
           if c == '@'
             state = POST_GLOBAL_AA
           else
             raise ProFormaError.new("Error In State #{state}, fixed modification detected without target amino acids found at index #{i}")
           end
-        elsif state == POST_GLOBAL_AA
+      elsif state == POST_GLOBAL_AA
           if VALID_AA.include?(c)
             current_aa_targets << c
           elsif c == ','
             # pass
           elsif c == '>'
-            fixed_modifications << ModificationRule.new(current_tag()[0], current_aa_targets())
+            fixed_modifications << ModificationRule.new(current_tag.process[0], targets: current_aa_targets.process)
               state = BEFORE
           else
             raise ProFormaError.new("Error In State #{state}, unclosed fixed modification rule")
           end
-        elsif state == POST_TAG_AFTER
+      elsif state == POST_TAG_AFTER
           if c == '/'
               state = CHARGE_START
               charge_buffer = NumberParser.new()
           elsif c == '+'
             raise ProFormaError.new("Error In State #{state}, #{c} found at index #{i}. Chimeric representation not supported")
           end
-        elsif state == CHARGE_START
+      elsif state == CHARGE_START
           if '+-'.include?(c)
               charge_buffer << c
               state = CHARGE_NUMBER
-          elsif c.isdigit()
+          elsif c.match(/[0-9]/)
               charge_buffer << c
               state = CHARGE_NUMBER
           elsif c == '/'
@@ -904,8 +1565,8 @@ module Proforma
           else
               raise ProFormaError.new("Error In State #{state}, unexpected #{c} found at index #{i}")
           end
-        elsif state == CHARGE_NUMBER
-          if c.isdigit()
+      elsif state == CHARGE_NUMBER
+          if c.match(/[0-9]/)
               charge_buffer << c
           elsif c == "["
               state = ADDUCT_START
@@ -913,21 +1574,20 @@ module Proforma
           else
               raise ProFormaError.new("Error In State #{state}, unexpected #{c} found at index #{i}")
           end
-        elsif state == ADDUCT_START
-          if c.isdigit() || "+-".include?(c) || element_symbols.include?(c)
+      elsif state == ADDUCT_START
+          if c.match(/[0-9]/) || "+-".include?(c) || element_symbols.include?(c)
             adduct_buffer << c
           elsif c == ','
             adduct_buffer.bound()
           elsif c == ']'
             state = ADDUCT_END
           end
-        elsif state == ADDUCT_END
+      elsif state == ADDUCT_END
           if c == '+'
-              raise ProFormaError.new("Error In State #{state}, #{c} found at index #{i}. Chimeric representation not supported")
+            raise ProFormaError.new("Error In State #{state}, #{c} found at index #{i}. Chimeric representation not supported")
           end
-        else
-          raise ProFormaError.new("Error In State #{state}, unexpected #{c} found at index #{i}")
-        end
+      else
+        raise ProFormaError.new("Error In State #{state}, unexpected #{c} found at index #{i}")
       end
     end
     if charge_buffer
@@ -942,7 +1602,7 @@ module Proforma
       charge_state = nil
     end
     if current_aa
-      positions << [current_aa, current_tag ? current_tag() : nil]
+      positions << [current_aa, current_tag.bool ? current_tag.process : nil]
     end
     if [ISOTOPE, TAG, TAG_AFTER, TAG_BEFORE, LABILE].include?(state)
       raise ProFormaError.new("Error In State #{state}, unclosed group reached end of string!")
@@ -956,7 +1616,7 @@ module Proforma
       'intervals' => intervals,
       'isotopes' => isotopes,
       'group_ids' => lambda { |x| current_tag.group_ids[x] },
-      'charge_state' => charge_state,
+      'charge_state' => charge_state
     }]
   end
 
@@ -982,7 +1642,7 @@ module Proforma
       obj.properties[@name] = value
     end
 
-    def __repr__
+    def inspect
       "#{self.class}(#{@name.inspect})"
     end
   end
@@ -995,30 +1655,30 @@ module Proforma
     def __init__(sequence, properties)
       @sequence = sequence
       @properties = properties
-
-      @isotopes = ProFormaProperty.new('isotopes')
-      @charge_state = ProFormaProperty.new('charge_state')
-  
-      @intervals = ProFormaProperty.new('intervals')
-      @fixed_modifications = ProFormaProperty.new('fixed_modifications')
-      @labile_modifications = ProFormaProperty.new('labile_modifications')
-      @unlocalized_modifications = ProFormaProperty.new('unlocalized_modifications')
-  
-      @n_term = ProFormaProperty.new('n_term')
-      @c_term = ProFormaProperty.new('c_term')
-  
-      @group_ids = _ProFormaProperty('group_ids')  
     end
 
-    def __str__
+    @@isotopes = ProFormaProperty.new('isotopes')
+    @@charge_state = ProFormaProperty.new('charge_state')
+
+    @@intervals = ProFormaProperty.new('intervals')
+    @@fixed_modifications = ProFormaProperty.new('fixed_modifications')
+    @@labile_modifications = ProFormaProperty.new('labile_modifications')
+    @@unlocalized_modifications = ProFormaProperty.new('unlocalized_modifications')
+
+    @@n_term = ProFormaProperty.new('n_term')
+    @@c_term = ProFormaProperty.new('c_term')
+
+    @@group_ids = ProFormaProperty.new('group_ids')  
+
+    def to_s
       to_proforma(@sequence, **@properties)
     end
 
-    def __repr__
+    def inspect
       "#{self.class}(#{@sequence}, #{@properties})"
     end
 
-    def __getitem__(i)
+    def [](i)
       if i.instance_of?(Range)
         props = @properties.dup
         ivs = []
@@ -1034,7 +1694,7 @@ module Proforma
       end
     end
 
-    def __eq__(other)
+    def ==(other)
       if other.instance_of?(String)
         self.to_s == other
       elsif other.nil?
@@ -1044,12 +1704,12 @@ module Proforma
       end
     end
 
-    def __ne__(other)
+    def !=(other)
       self != other
     end
 
     def self.parse(string)
-      self.new(*parse(string))
+      Proforma.parse(string)
     end
 
     #@property
