@@ -57,30 +57,26 @@ module Proforma
     end
   end
 
-  class PrefixSavingMeta
-    def initialize(...)
-      __new__(...)
-    end
+  module PrefixSavingMeta
 
-    def __new__(mcs, name, parents, attrs)
-      new_type = type.__new__(mcs, name, parents, attrs)
-      prefix = attrs["prefix_name"]
-      if prefix
-        new_type.prefix_map[prefix.downcase] = new_type
+    def __new__(prefix_map)
+      new_class = Class.new
+      if self.respond_to?("prefix_name")
+        prefix_map["prefix_name"] = new_class
       end
-      short = attrs["short_prefix"]
-      if short
-        new_type.prefix_map[short.downcase] = new_type
+      if self.respond_to?("short_prefix")
+        prefix_map["short_prefix"] = new_class
       end
-      new_type
+      prefix_map
     end
 
     def find_by_tag(tag_name)
       if tag_name.nil?
         raise ValueError, "tag_name cannot be None!"
       end
-      tag_name = tag_name.lower()
-      return @prefix_map[tag_name]
+      tag_name = tag_name.downcase
+      prefix_map = get_prefix_map()
+      return prefix_map[tag_name]
     end
   end
 
@@ -117,6 +113,7 @@ module Proforma
 
   #@add_metaclass(PrefixSavingMeta)
   class TagBase
+    include PrefixSavingMeta
     attr_reader :type, :value, :extra, :group_id
 
     @@prefix_name = nil
@@ -132,6 +129,11 @@ module Proforma
       @value = value
       @extra = extra
       @group_id = group_id
+      @@prefix_map = __new__(@@prefix_map)
+    end
+
+    def get_prefix_map
+      @@prefix_map
     end
 
     def to_s
@@ -264,7 +266,7 @@ module Proforma
         sigfigs = 4
       end
       @_significant_figures = sigfigs
-      super(TagTypeEnum.massmod, value.to_f, extra, group_id)
+      super(TagTypeEnum.massmod, value.to_f, extra: extra, group_id: group_id)
     end
 
     def _format_main
@@ -818,8 +820,8 @@ module Proforma
     ends << tokens.size
     out = []
     starts.each_with_index do |start, i|
-      _end = ends[i]
-      tag = tokens[start..._end]
+      eend = ends[i]
+      tag = tokens[start...eend]
       next if tag.size == 0
       out << tag
     end
@@ -861,7 +863,7 @@ module Proforma
     parts = split_tags(tokens)
     main_tag = parts[0]
     if ['+', '-'].include?(main_tag[0])
-      main_tag = ''.join(main_tag)
+      main_tag = main_tag.join('')
       main_tag = MassModification.new(main_tag)
     elsif main_tag[0] == '#'
       main_tag = process_marker(main_tag)
@@ -871,7 +873,7 @@ module Proforma
         main_tag = GenericModification.new(value)
       else
         tag_type = TagBase.new(self.class, value).find_by_tag(prefix)
-        main_tag = tag_type(value)
+        main_tag = tag_type.new(value)
       end
     end
     if parts.size > 1
@@ -976,15 +978,15 @@ module Proforma
   )
   
   class TaggedInterval
-    attr_reader :start, :_end, :tags, :ambiguous
+    attr_accessor :start, :eend, :tags, :ambiguous
 
     def initialize(...)
       __init__(...)
     end
 
-    def __init__(start, _end: nil, tags: nil, ambiguous: false)
+    def __init__(start, eend: nil, tags: nil, ambiguous: false)
       @start = start
-      @_end = _end
+      @eend = eend
       @tags = tags
       @ambiguous = ambiguous
     end
@@ -993,7 +995,7 @@ module Proforma
       if other.nil?
           return false
       end
-      @start == other.start && @_end == other._end && @tags == other.tags
+      @start == other.start && @eend == other.eend && @tags == other.tags
     end
 
     def __ne__(other)
@@ -1001,23 +1003,23 @@ module Proforma
     end
 
     def __str__
-      return "(#{@start}-#{@_end})#{@tags.inspect}"
+      return "(#{@start}-#{@eend})#{@tags.inspect}"
     end
 
     def __repr__
-      "#{self.class}(#{@start}, #{@_end}, #{@tags})"
+      "#{self.class}(#{@start}, #{@eend}, #{@tags})"
     end
 
     def as_slice
-      @start...@_end
+      @start...@eend
     end
 
     def copy
-      __class__(@start, @_end, @tags)
+      __class__(@start, @eend, @tags)
     end
 
     def _check_slice(qstart, qend, warn_ambiguous)
-      valid = qstart <= @start && qend >= @_end
+      valid = qstart <= @start && qend >= @eend
       _case = valid ? IntersectionEnum.new.full_contained_in_interval : IntersectionEnum.new.no_overlap
       if valid.!
         valid = qstart <= @start && qend > @start
@@ -1030,7 +1032,7 @@ module Proforma
       end
   
       if valid.!
-        valid = qstart < @_end and qend > @_end
+        valid = qstart < @eend and qend > @eend
         if valid
           _case = IntersectionEnum.new.end_overlap
           if warn_ambiguous
@@ -1040,7 +1042,7 @@ module Proforma
       end
   
       if valid
-        valid = qstart >= @start && qend < @_end
+        valid = qstart >= @start && qend < @eend
         if valid
           _case = IntersectionEnum.new.full_contains_interval
           if warn_ambiguous
@@ -1051,11 +1053,11 @@ module Proforma
       return [valid, _case]
     end
 
-    def _update_coordinates_sliced(start: nil, _end: nil, warn_ambiguous: true)
-      if _end.nil?
-        qend = @_end + 1
+    def _update_coordinates_sliced(start: nil, eend: nil, warn_ambiguous: true)
+      if eend.nil?
+        qend = @eend + 1
       else
-        qend = _end
+        qend = eend
       end
       if start.nil?
         qstart = @start - 1
@@ -1076,12 +1078,12 @@ module Proforma
         end
         @start = diff
       end
-      if _end.nil?.!
-        width = [@_end, _end].min - @start
+      if eend.nil?.!
+        width = [@eend, eend].min - @start
       else
-        width = @_end - [start, @start].max
+        width = @eend - [start, @start].max
       end
-      _new._end = _new.start + width
+      _new.eend = _new.start + width
       return _new
     end
   end
@@ -1254,7 +1256,7 @@ module Proforma
       :charge_state_start,
       :charge_state_number,
       :charge_state_adduct_start,
-      :charge_state_adduct_end,
+      :charge_state_adducteend,
       :inter_chain_cross_link_start,
       :chimeric_start,
       :interval_initial,
@@ -1280,7 +1282,7 @@ module Proforma
     charge_state_start = 16,
     charge_state_number = 17,
     charge_state_adduct_start = 18,
-    charge_state_adduct_end = 19,
+    charge_state_adducteend = 19,
     inter_chain_cross_link_start = 20,
     chimeric_start = 21,
     interval_initial = 22,
@@ -1307,7 +1309,7 @@ module Proforma
   CHARGE_START = ParserStateEnum.charge_state_start
   CHARGE_NUMBER = ParserStateEnum.charge_state_number
   ADDUCT_START = ParserStateEnum.charge_state_adduct_start
-  ADDUCT_END = ParserStateEnum.charge_state_adduct_end
+  ADDUCTeend = ParserStateEnum.charge_state_adducteend
   DONE = ParserStateEnum.done
   
   VALID_AA = 'QWERTYIPASDFGHKLCVNMXUOJZB'.split('').to_set
@@ -1389,7 +1391,7 @@ module Proforma
           if current_interval.nil?
             raise ProFormaError.new("Error In State #{state}, unexpected #{c} found at index #{i}")
           else
-            current_interval._end = positions.size
+            current_interval.eend = positions.size
             if i < n && sequence[i] == '['
               i += 1
               depth = 1
@@ -1580,9 +1582,9 @@ module Proforma
           elsif c == ','
             adduct_buffer.bound()
           elsif c == ']'
-            state = ADDUCT_END
+            state = ADDUCTeend
           end
-      elsif state == ADDUCT_END
+      elsif state == ADDUCTeend
           if c == '+'
             raise ProFormaError.new("Error In State #{state}, #{c} found at index #{i}. Chimeric representation not supported")
           end
@@ -1623,6 +1625,52 @@ module Proforma
   def to_proforma(sequence, n_term: nil, c_term: nil, unlocalized_modifications: nil,
     labile_modifications: nil, fixed_modifications: nil, intervals: nil,
     isotopes: nil, charge_state: nil, group_ids: nil)
+    primary = []
+    sequence.each do |aa, tags|
+      if tags.nil?
+        primary << aa.to_s
+      else
+        primary << aa.to_s.concat(tags.map{ |t| "[#{t.to_s}]" }.join(''))
+      end
+    end
+    if intervals.nil?.!
+      intervals.sort_by{ |x| x.start }.each do |iv|
+        if iv.ambiguous
+          primary[iv.start] = '(?' + primary[iv.start]
+        else
+          primary[iv.start] = '(' + primary[iv.start]
+        end
+
+        terminator = '{0!s})'.format(primary[iv.end - 1])
+        if iv.tags
+          terminator += iv.tags.map{ |t| "[#{t.to_s}]"}.join('')
+        end
+        primary[iv.eend - 1] = terminator
+      end
+    end
+    if n_term
+      primary.unshift n_term.map{ |t| "[#{t.to_s}]" }.join('').concat('-')
+    end
+    if c_term
+      primary << '-'.concat(c_term.map{ |t| "[#{t.to_s}" }.join(''))
+    end
+    if charge_state
+      primary << "/#{charge_state.to_s}"
+    end
+    if labile_modifications
+      primary.unshift labile_modifications.map{ |m| "{{#{m.to_s}}}" }
+    end
+    if unlocalized_modifications
+      primary.unshift "?"
+      primary.unshift unlocalized_modifications.map{ |m| "#{m.to_s}" }
+    end
+    if isotopes
+      primary.unshift isotopes.map{ |m| "#{m.to_s}" }
+    end
+    if fixed_modifications
+      primary.unshift fixed_modifications.map{ |m| "#{m.to_s}" }
+    end
+    primary.join('')
   end
 
   class ProFormaProperty

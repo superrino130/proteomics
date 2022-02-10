@@ -940,7 +940,7 @@ def _check_use_index(source, use_index, default)
       @seekable = nil
     end
 
-    if f.read.encoding == Encoding::ASCII_8BIT
+    if f.nil?.! && f.read.encoding == Encoding::ASCII_8BIT
       binary = true
     else
       binary = false
@@ -976,6 +976,7 @@ def _check_use_index(source, use_index, default)
         warn "Could not check mode on #{source}. Reason: #{exception.message}. Specify `use_index` explicitly to avoid errors."
         return default
       end
+      warn exception.message
       return use_index
     end
   end
