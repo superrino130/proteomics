@@ -505,7 +505,7 @@ end
 
 module IndexSavingMixin
   include NoOpBaseReader
-  _index_class = NotImplementedError
+  @@_index_class = NotImplementedError
 
   #property
   def _byte_offset_filename
@@ -549,7 +549,7 @@ module IndexSavingMixin
 
   def _read_byte_offsets
     File.open(@_byte_offset_filename) do |f|
-      index = _index_class.load(f)
+      index = @@_index_class.load(f)
       @_offset_index = index
     end
   end
@@ -741,8 +741,7 @@ end
 
 class IndexSavingTextReader < IndexedTextReader
   prepend IndexSavingMixin
-
-  # Not started
+  @@_index_class = OffsetIndex
 end
 
 class HierarchicalOffsetIndex
@@ -940,10 +939,10 @@ def _check_use_index(source, use_index, default)
       @seekable = nil
     end
 
-    if f.nil?.! && f.read.encoding == Encoding::ASCII_8BIT
-      binary = true
+    if f.nil?.!
+      binary = f.read.encoding == Encoding::ASCII_8BIT
     else
-      binary = false
+      binary = nil
     end
 
     if @seekable == false

@@ -26,8 +26,10 @@ BaseString ||= String
 require 'set'
 require 'open-uri'
 require 'delegate'
+require 'rexml/document'
 
-module XML
+module Xml
+  module_function
   def _local_name(element)
     tag = element.tag
     if ['', 0, nil, false, [], {}].include?(tag).! && tag[0] == '{'
@@ -37,7 +39,13 @@ module XML
   end
   
   def xsd_parser(schema_url)
-    # Not started
+    ret = {}
+    if (schema_url.start_with?('http://') || schema_url.start_with?('https://') || schema_url.start_with?('file://')).!
+      schema_url = 'file://' + schema_url
+    end
+    URI.open(schema_url) do |schema_file|
+      doc = REXML::Document.new xml
+    end
   end
   
   module XMLValueConverter
@@ -652,11 +660,12 @@ module XML
   
   class IndexedXML < XML
     prepend IndexedReaderMixin
-  
+
+    @@_indexed_tags = Set.new
+    @@_indexed_tag_keys = {}
+    @@_use_index = true
+
     def initialize(...)
-      @_indexed_tags = Set.new
-      @_indexed_tag_keys = {}
-      @_use_index = true
       __init__(...)
     end
   
@@ -765,11 +774,14 @@ module XML
   end
   
   class MultiProcessingXML < IndexedXML
-    # include TaskMappingMixin
   
     def initialize(...)
-      super
       @tmmixin = TaskMappingMixin.new(...)
+      __init__(...)
+    end
+
+    def __init__(source, *args, **kwargs)
+      super
     end
   
     def _task_map_iterator
@@ -802,37 +814,38 @@ module XML
   end
   
   class ArrayConversionMixin < BinaryDataArrayTransformer
+    @@_dtype_dict = {}
+    @@_array_keys = ['m/z array', 'intensity array']
+    
     def initialize(...)
-      @_dtype_dict = {}
-      @_array_keys = ['m/z array', 'intensity array']
       __init__(...)
     end
   
     def __init__(*args, **kwargs)
-      @_dtype_dict = {'None' => nil}
+      @@_dtype_dict = {'None' => nil}
       dtype = kwargs.delete('dtype') || nil
       if dtype.is_a(Hash)
-        @_dtype_dict.merge!(dtype)
+        @@_dtype_dict.merge!(dtype)
       elsif dtype.nil?.!
-        @_dtype_dict = @_array_keys.map{ |k| [k, dtype] }.to_h
-        @_dtype_dict['None'] = dtype
+        @@_dtype_dict = @@_array_keys.map{ |k| [k, dtype] }.to_h
+        @@_dtype_dict['None'] = dtype
       end
       super
     end
   
     def __getstate__
       state = super
-      state['_dtype_dict'] = @_dtype_dict
+      state['_dtype_dict'] = @@_dtype_dict
       state
     end
   
     def __setstate__(state)
       super
-      @_dtype_dict = state['_dtype_dict']
+      @@_dtype_dict = state['_dtype_dict']
     end
   
     def _convert_array(k, array)
-      dtype = @_dtype_dict[k]
+      dtype = @@_dtype_dict[k]
       if dtype.nil?.!
         return array.astype(dtype)
       end

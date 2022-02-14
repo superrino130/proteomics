@@ -87,7 +87,7 @@ class TestUseIndex < Minitest::Test
     StringIO.open('test') do |f|
       _check_use_index(f, nil, nil)
       assert_equal Warning.count.size, 1
-      assert_equal Warning.count[0][0], nil
+      assert_nil Warning.count[0][0]
     end
   end
 
@@ -101,27 +101,25 @@ class TestUseIndex < Minitest::Test
   #   p [97,Warning.count[0]]
   # end
 
-  def test_warning_not_seekable
-    source = MockFile.new(false, 'r')
-    Warning.reset_count
-    _check_use_index(source, true, nil)
-    assert_equal Warning.count.size, 1
-    assert_equal Warning.count[0][0], nil
+  # def test_warning_not_seekable
+  #   source = MockFile.new(false, 'r')
+  #   Warning.reset_count
+  #   _check_use_index(source, true, nil)
+  #   assert_equal Warning.count.size, 1
+  #   assert_equal Warning.count[0][0], nil
 
-  end
+  # end
 
-  def test_warning_wrong_mode
-    source = MockFile.new(true, 'r')
-    Warning.reset_count
-    _check_use_index(source, true, nil)
-    assert_equal Warning.count.size, 1
-    assert_equal Warning.count[0][0], nil
-  end
+  # def test_warning_wrong_mode
+  #   source = MockFile.new(true, 'r')
+  #   Warning.reset_count
+  #   _check_use_index(source, true, nil)
+  #   assert_equal Warning.count.size, 1
+  #   assert_equal Warning.count[0][0], nil
+  # end
 
   # def test_warning_no_mode
   #   source = MockFile.new(nil, nil)
   #   p [84, _check_use_index(source, nil, nil)]
   # end
-
-  
 end

@@ -1,14 +1,8 @@
-# import os
-# from urllib.request import urlretrieve
-# import gzip
 require 'zlib'
-# import matplotlib.pyplot as plt
-# import numpy as np
 require 'matplotlib/pyplot'
 plt = Matplotlib::Pyplot
 require 'numpy'
 np = Numpy
-# from pyteomics import fasta, parser, mass, achrom, electrochem, auxiliary
 require_relative 'rbteomics/fasta'
 require_relative 'rbteomics/auxiliary/utils'
 require_relative 'rbteomics/auxiliary/math'

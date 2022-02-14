@@ -1,4 +1,3 @@
-# import pylab
 require 'matplotlib/pyplot'
 plt = Matplotlib::Pyplot
 
@@ -8,10 +7,8 @@ require_relative 'rbteomics/pepxml'
 require_relative 'rbteomics/mzid'
 # require_relative 'rbteomics/mass/mass'
 
-# import pandas as pd
 require 'pandas'
 pd = Pandas
-# import numpy as np
 require 'numpy'
 np = Numpy
 
