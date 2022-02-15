@@ -67,7 +67,7 @@ module Mzxml
     end
   end
 
-  class MzXML
+  class MzXML < Xml::XML
     # (xml.ArrayConversionMixin, aux.TimeOrderedIndexedReaderMixin, xml.MultiProcessingXML, xml.IndexSavingXML)
     @@_root_element = 'mzXML'
     @@_default_iter_tag = 'scan'
@@ -199,6 +199,10 @@ module Mzxml
           end
         end
       end
+    end
+
+    def next(...)
+      iterfind(...)
     end
 
     def _get_time(scan)

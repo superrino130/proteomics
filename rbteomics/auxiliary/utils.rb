@@ -125,7 +125,7 @@ end
 
 if np
   class BinaryDataArrayTransformer
-    @compression_type_map = @_default_compression_map
+    @@compression_type_map = @_default_compression_map
   
     # class Binary_array_record([
     #   "binary_array_record",

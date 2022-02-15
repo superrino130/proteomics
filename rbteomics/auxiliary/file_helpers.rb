@@ -81,7 +81,6 @@ def _keepstate_method(func)
   wrapped
 end
 
-# class _file_obj
 class File_obj
   def initialize(...)
     __init__(...)
@@ -414,7 +413,7 @@ class TimeOrderedIndexedReaderMixin
 
   def __init__(*args, **kwargs)
     super
-    @_time = RTLocator.new
+    @_time = RTLocator.new(self)
   end
 
   #staticmethod

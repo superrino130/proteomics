@@ -11,26 +11,28 @@
 # import numpy as np
 
 require 'minitest/autorun'
-require_relative '../rbteomics/mzxml'
+require_relative '../rbteomics/mzml'
 require_relative '../rbteomics/xml'
 require_relative 'data'
 require 'set'
 require 'tempfile'
 require 'numpy'
 
-class TestMzxml < Minitest::Test
+class TestMzml < Minitest::Test
   def setup
     @maxDiff = nil
-    @path = 'test.mzXML'
+    @path = 'test.mzML'
   end
 
-  def testReadSpectrum
+  def test_read
+    [true, false].repeated_permutation(3) do |rs, it, ui|
+      next if rs
+      # for func in [MzML, read, chain,
+      #   lambda x, **kw: chain.from_iterable([x], **kw), PreIndexedMzML]:
 
-  end
+      r = Mzml::MzML.new(@path, 'read_schema' => rs, 'iterative' => it, 'use_index' => ui)
+      assert_equal Mzml_spectra, r.to_s
+    end
 
-  def test_decoding
-    reader = Mzxml::MzXML.new(@path, decode_binary: true)
-    spectrum = reader.next(@path)
-    assert_equal spectrum['m/z array'], nil
   end
 end

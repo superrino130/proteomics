@@ -542,6 +542,10 @@ module Xml
     def self._element_handlers
       @@_element_handlers
     end
+
+    def version_info
+      # PASS
+    end
   end
   
   Pattern_path = Regexp.compile('([\w/*]*)(.*)')
@@ -555,28 +559,27 @@ module Xml
   end
   
   def _make_version_info(cls)
-    def version_info(source)
+    version_info = lambda do |source|
       cls.new(source).version_info
     end
     # version_info.__doc__ = "
-    version_info.__doc__ = "
-    Provide version information about the #{cls.file_format} file.
+    # Provide version information about the #{@file_format} file.
   
-    .. note:: This function is provided for backward compatibility only.
-        It simply creates an :py:class:`#{cls.__name__}` instance
-        and returns its :py:data:`!version_info` attribute.
+    # .. note:: This function is provided for backward compatibility only.
+    #     It simply creates an :py:class:`#{cls.class}` instance
+    #     and returns its :py:data:`!version_info` attribute.
   
-    Parameters
-    ----------
-    source : str or file
-        File name or file-like object.
+    # Parameters
+    # ----------
+    # source : str or file
+    #     File name or file-like object.
   
-    Returns
-    -------
-    out : tuple
-        A (version, schema URL) tuple, both elements are strings or None.
-    "
-    version_info('Not started')
+    # Returns
+    # -------
+    # out : tuple
+    #     A (version, schema URL) tuple, both elements are strings or None.
+    # "
+    version_info.call('Not started')
   end
   
   class ByteCountingXMLScanner < File_obj
@@ -766,7 +769,7 @@ module Xml
     end
   
     def iterfind(path, **kwargs)
-      if @_indexed_tags.include?(path) && @_use_index
+      if @_indexed_tags.nil?.! && @_indexed_tags.include?(path) && @_use_index
         return IndexedIterfind.new(path, **kwargs)
       end
       Iterfind.new(path, **kwargs)
@@ -824,13 +827,13 @@ module Xml
     def __init__(*args, **kwargs)
       @@_dtype_dict = {'None' => nil}
       dtype = kwargs.delete('dtype') || nil
-      if dtype.is_a(Hash)
+      if dtype.is_a?(Hash)
         @@_dtype_dict.merge!(dtype)
       elsif dtype.nil?.!
         @@_dtype_dict = @@_array_keys.map{ |k| [k, dtype] }.to_h
         @@_dtype_dict['None'] = dtype
       end
-      super
+      # super
     end
   
     def __getstate__

@@ -211,7 +211,8 @@ Pepxml_results = [
      'spectrum' => '"Cmpd 24, +MSn(1085.6886), 1.2 min.23.23.3"',
      'start_scan' => 23}]
 
-Mzid_spectra = {[false, false] => [{'id' => 'SEQ_spec1',
+Mzid_spectra = {
+                [false, false] => [{'id' => 'SEQ_spec1',
                                   'spectraData_ref' => 'LCMALDI_spectra',
                                   'spectrumID' => 'databasekey=1'},
                                  {'id' => 'SEQ_spec2a',
@@ -1302,7 +1303,7 @@ Mzid_spectra = {[false, false] => [{'id' => 'SEQ_spec1',
 mzml_mz_array = Numpy.load("C:\\Users\\2021g000\\Documents\\naka\\github\\proteomics\\tests\\test_mzml_mz.npy")
 # mzml_int_array = Numpy.load('./test_mzml_intensity.npy')
 mzml_int_array = Numpy.load("C:\\Users\\2021g000\\Documents\\naka\\github\\proteomics\\tests\\test_mzml_intensity.npy")
-mzml_spectra = [
+Mzml_spectra = [
   {'MSn spectrum' => '',
     'base peak intensity' => 1471973.875,
     'base peak m/z' => 810.415283203125,
@@ -1394,7 +1395,7 @@ Mgf_spectra_long = [
                'username' => 'Lou Scene'}}]
 
 Mgf_spectra_short = [
-  {'intensity array' => makeCA(Mgf_int[0]),
+   {'intensity array' => makeCA(Mgf_int[0]),
     'charge array' => makeCA(Mgf_ch[0]),
     'm/z array' => makeCA(Mgf_mz[0]),
     'params' => {'pepmass' => [983.6, nil], 'title' => 'Spectrum 1',
@@ -1670,7 +1671,8 @@ Tandem_spectra = [{'act' => '0',
                                                                        'label' => '11745.y'}}},
                    'z' => 2}]
 
-Features = [{'FWHM' => 8.53579425811768,
+Features = [
+            {'FWHM' => 8.53579425811768,
              'charge' => 1,
              'convexhull' => [{'nr' => 0,
                              'pt' => [{'x' => 4020.447, 'y' => 489.778198242188},
@@ -2112,21 +2114,23 @@ Ms1_spectra = [
                 'TIC' => '2694200',
                 'scan' => ['2', '2']}}]
 
-Ms1_spectra_lists = [{'intensity array' => [0.0, 20.0522, 29.26406, 30.04175, 20.19221, 11.58895, 0.0],
+Ms1_spectra_lists = [
+                    {'intensity array' => [0.0, 20.0522, 29.26406, 30.04175, 20.19221, 11.58895, 0.0],
                       'm/z array' => [2.51263, 82.51282, 82.51301, 82.51321, 82.5134, 82.51359, 82.51378],
                       'params' => {'BPI' => '585566',
                                  'BPM' => '544.2904',
                                  'RTime' => 0.987225,
                                  'TIC' => '3728760',
                                  'scan' => ['1', '1']}},
-                     {'intensity array' => [0.0, 31.2197, 37.46051, 44.36585, 49.12939, 44.33195, 35.1637, 33.48032, 0.0],
+                    {'intensity array' => [0.0, 31.2197, 37.46051, 44.36585, 49.12939, 44.33195, 35.1637, 33.48032, 0.0],
                       'm/z array' => [82.6435, 82.6437, 82.64389, 82.64408, 82.64427, 82.64447, 82.64466, 82.64485,
                                     82.64504],
                       'params' => {'BPI' => '713524',
                                  'BPM' => '544.2904',
                                  'RTime' => 1.32083,
                                  'TIC' => '2694200',
-                                 'scan' => ['2', '2']}}]
+                                 'scan' => ['2', '2']}
+                      }]
 
 Ms1_header = {'CreationDate' => 'Sat Jun 03 15:25:10 2017',
               'Extractor version' => 'Xcalibur',
@@ -2698,8 +2702,8 @@ Protxml_results = [{'group_number' => 1,
                                                               'VPDDIYKTHIENNR', 'VQREPIITIVK', 'YGEPTIR',
                                                               'YIYSSEDYIK']}]}]
 
-Transitions = [[{
-  'Precursor' => {'charge state' => 2.0,
+Transitions = [
+  [{'Precursor' => {'charge state' => 2.0,
     'isolation window target m/z' => 862.9467},
     'Prediction' => {'contactRef' => 'CS',
                    'linear ion trap' => '',
@@ -2745,8 +2749,8 @@ Transitions = [[{
         'retention time window upper offset' => 3.0,
         'softwareRef' => 'Skyline0.5'}],
       'id' => 'ADTHFLLNIYDQLR-M1-T1',
-      'peptideRef' => 'ADTHFLLNIYDQLR-M1'}, {
-    'IntermediateProduct' => [{
+      'peptideRef' => 'ADTHFLLNIYDQLR-M1'},
+    {'IntermediateProduct' => [{
       'ConfigurationList' => {
         'Configuration' => [{
           'collision energy' => 26.0,
@@ -2786,11 +2790,11 @@ Transitions = [[{
       'retention time window upper offset' => 3.0,
       'softwareRef' => 'Skyline0.5'}],
     'id' => 'ADTHFLLNIYDQLR-M1-T2',
-    'peptideRef' => 'ADTHFLLNIYDQLR-M1'}], [{
-    'Precursor' => {
+    'peptideRef' => 'ADTHFLLNIYDQLR-M1'}],
+  [{'Precursor' => {
       'charge state' => 2.0,
       'isolation window target m/z' => 862.9467},
-    'Prediction' => {
+      'Prediction' => {
       'contact' => {
         'contact URL' => 'http://www.systemsbiology.org/',
         'contact address' => '1441 NE 34th St, Seattle WA 98103, USA',
@@ -2804,31 +2808,31 @@ Transitions = [[{
       'peak targeting suitability rank' => 1.0,
       'software' => {'name' => 'MaRiMba', 'id' => 'MaRiMba', 'version' => '1.0'},
       'transition purported from an MS/MS spectrum on a different, specified instrument' => ''},
-    'Product' => {
-      'ConfigurationList' => {
-        'Configuration' => [{
+      'Product' => {
+        'ConfigurationList' => {
+          'Configuration' => [{
           'ValidationStatus' => [{
-            '4000 QTRAP' => '',
-            'peak intensity' => 4072.0,
-            'peak intensity rank' => 2.0,
-            'peak targeting suitability rank' => 1.0,
-            'transition optimized on specified instrument' => ''}],
-          'collision energy' => 26.0,
-          'collision gas' => 'argon',
-          'collision gas pressure' => 12.0,
-          'cone voltage' => 1200.0,
-          'contact' => {
-            'contact URL' => 'http://www.systemsbiology.org/',
-            'contact address' => '1441 NE 34th St, Seattle WA 98103, USA',
-            'contact email' => 'example@systemsbiology.org',
-            'contact name' => 'Eric Deutsch',
-            'contact organization' => 'Institute for Systems Biology',
-            'id' => 'CS'},
-          'declustering potential' => 64.0,
-          'dwell time' => 0.12,
-          'instrument' => {'4000 QTRAP' => '', 'id' => 'QTRAP'},
-          'interchannel delay' => 0.01,
-          'tube lens voltage' => 23.0}]},
+              '4000 QTRAP' => '',
+             'peak intensity' => 4072.0,
+              'peak intensity rank' => 2.0,
+              'peak targeting suitability rank' => 1.0,
+              'transition optimized on specified instrument' => ''}],
+            'collision energy' => 26.0,
+            'collision gas' => 'argon',
+            'collision gas pressure' => 12.0,
+            'cone voltage' => 1200.0,
+            'contact' => {
+              'contact URL' => 'http://www.systemsbiology.org/',
+              'contact address' => '1441 NE 34th St, Seattle WA 98103, USA',
+              'contact email' => 'example@systemsbiology.org',
+             'contact name' => 'Eric Deutsch',
+             'contact organization' => 'Institute for Systems Biology',
+             'id' => 'CS'},
+            'declustering potential' => 64.0,
+            'dwell time' => 0.12,
+           'instrument' => {'4000 QTRAP' => '', 'id' => 'QTRAP'},
+           'interchannel delay' => 0.01,
+           'tube lens voltage' => 23.0}]},
       'InterpretationList' => {
         'Interpretation' => [{
           'name' => 'frag: y ion',
@@ -2975,7 +2979,8 @@ Transitions = [[{
       'peptide group label' => 'G1',
       'predicted isoelectric point' => 5.22,
       'sequence' => 'ADTHFLLNIYDQLR',
-      'theoretical mass' => 1189.22}}]]
+      'theoretical mass' => 1189.22}}]
+    ]
 
 Idxml_data = {
   [0, 0] => [{
@@ -3064,20 +3069,34 @@ Idxml_data = {
          'OMSSA_score' => 0.0}]}]}]}
  
 
-Usi_proxi_data = {'attributes' => [{'accession' => 'MS:1008025',
-                 'name' => 'scan number',
-                 'value' => '131256'},
-                {'accession' => 'MS:1000827',
-                 'name' => 'isolation window target m/z',
-                 'value' => '1046.4921'},
-                {'accession' => 'MS:1000041', 'name' => 'charge state', 'value' => '2'},
-                {'accession' => 'MS:1003061',
-                 'name' => 'spectrum name',
-                 'value' => 'DLPQGFSALEPLVDLPIGIN[HexNac]ITR/2'},
-                {'accession' => 'MS:1000888',
-                 'name' => 'unmodified peptide sequence',
-                 'value' => 'DLPQGFSALEPLVDLPIGINITR'}],
- 'm/z array' => [[120.0807,  121.0838,  122.0601,  122.1212,  124.0394,  125.0707,
+Usi_proxi_data = {
+  'attributes' => [
+    {
+      'accession' => 'MS:1008025',
+      'name' => 'scan number',
+      'value' => '131256'
+    },
+    {
+      'accession' => 'MS:1000827',
+      'name' => 'isolation window target m/z',
+      'value' => '1046.4921'
+    },
+    {
+      'accession' => 'MS:1000041',
+      'name' => 'charge state',
+      'value' => '2'
+    },
+    {
+      'accession' => 'MS:1003061',
+      'name' => 'spectrum name',
+      'value' => 'DLPQGFSALEPLVDLPIGIN[HexNac]ITR/2'
+    },
+    {
+      'accession' => 'MS:1000888',
+      'name' => 'unmodified peptide sequence',
+      'value' => 'DLPQGFSALEPLVDLPIGINITR'
+    }],
+  'm/z array' => [[120.0807,  121.0838,  122.0601,  122.1212,  124.0394,  125.0707,
                      126.0549,  127.0389,  127.0582,  128.0422,  129.0658,  130.0976,
                      131.0815,  135.8235,  138.0549,  138.1278,  139.0524,  139.0584,
                      139.0868,  140.0595,  140.0704,  141.0658,  141.1022,  143.1179,
@@ -3164,7 +3183,7 @@ Usi_proxi_data = {'attributes' => [{'accession' => 'MS:1008025',
                      1503.89, 1504.8904, 1505.8995, 1528.8531, 1532.8982, 1605.9242,
                      1606.922, 1623.9305, 1624.9381, 1625.9446, 1626.9426, 1735.6211,
                      1752.9758, 1753.9739, 1898.9847]],
- 'intensity array' => [[41966.6758,   2547.6956,   3291.5342,   2838.4585,   4198.6621,
+  'intensity array' => [[41966.6758,   2547.6956,   3291.5342,   2838.4585,   4198.6621,
                            2980.3152, 255955.7031, 259554.2812,  15788.3789,  15573.1006,
                            4178.9922,   5410.9072,   5616.8442,   2474.366, 954771.875,
                            10152.6621,   5554.1558,  63132.4688,   6978.6929,   3852.3772,
