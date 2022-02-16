@@ -8,17 +8,18 @@ require_relative '../rbteomics/auxiliary/target_decoy'
 
 module Tandem
   module_function
-  class TandemXML < XML::XML
+  class TandemXML < Xml::XML
+    @@file_format = "TandemXML"
+    @@_root_element = "bioml"
+    @@_default_schema = Tandem_schema_defaults
+    @@_default_iter_path = 'group[@type="model"]'
+    @@_structures_to_flatten = Set.new(['domain'])
+
     def initialize(...)
       __init__(...)
     end
   
     def __init__(*args, **kwargs)
-      @file_format = "TandemXML"
-      @_root_element = "bioml"
-      @_default_schema = Tandem_schema_defaults
-      @_default_iter_path = 'group[@type="model"]'
-      @_structures_to_flatten = Set.new(['domain'])
       if kwargs.include?('recursive').!
         super(*args, 'recursive' => true, **kwargs)
       else
@@ -62,7 +63,7 @@ module Tandem
       if info.include?('support')
         (info['support']['supporting data'] || {}).each do |_, d|
           ['Xdata', 'Ydata'].each do |label|
-            # d[label]['values'] = d[label]['values'].astype(int)
+            d[label]['values'] = d[label]['values'].to_i
             d[label].delete('label')
           end
         end
@@ -84,7 +85,7 @@ module Tandem
     end
   
     def _get_schema_info(read_schema)
-      @_default_schema
+      @@_default_schema
     end
   
     def __next__
@@ -105,31 +106,31 @@ module Tandem
   end
   
   def iterfind(source, path, **kwargs)
-    # Not started
+    TandemXML.new(source, **kwargs).iterfing(path, **kwargs)
   end
   
-  TD_chain = ChainBase._make_chain(TandemXML)
+  Chain = ChainBase._make_chain(TandemXML)
   
   @_is_decoy_prefix = lambda do |psm, prefix='DECOY_'|
-    # Not started
+    psm['protein'].all?{ |prot| prot['label'].start_with?(prefix) }
   end
   
   @_is_decoy_suffix = lambda do |psm, suffix='_DECOY'|
-    # Not started
+    psm['protein'].all?{ |prot| prot['label'].end_with?(suffix) }
   end
   
   is_decoy = @_is_decoy_prefix
-  @qvalues = Target_decoy::Make_qvalues.call(TD_chain, @_is_decoy_prefix, @_is_decoy_suffix, Itemgetter.new('expect'))
+  @qvalues = Target_decoy::Make_qvalues.call(Chain, @_is_decoy_prefix, @_is_decoy_suffix, Itemgetter.new('expect'))
   fdr = Target_decoy::Make_fdr.call(@_is_decoy_prefix, @_is_decoy_suffix)
   filter = lambda do |x = nil|
     if x.nil?
-      _make_filter(TD_chain, @_is_decoy_prefix, @_is_decoy_suffix, Itemgetter.new('expect'), @qvalues)
+      _make_filter(Chain, @_is_decoy_prefix, @_is_decoy_suffix, Itemgetter.new('expect'), @qvalues)
     elsif x == 'chain' || x == :chain
-      y = _make_filter(TD_chain, @_is_decoy_prefix, @_is_decoy_suffix, Itemgetter.new('expect'), @qvalues)
+      y = _make_filter(Chain, @_is_decoy_prefix, @_is_decoy_suffix, Itemgetter.new('expect'), @qvalues)
       _make_chain(t, 'filter', true)
     end
   end
-  # filter = _make_filter(TD_chain, _is_decoy_prefix, _is_decoy_suffix, Itemgetter.new('expect'), qvalues)
+  # filter = _make_filter(chain, _is_decoy_prefix, _is_decoy_suffix, Itemgetter.new('expect'), qvalues)
   # filter.chain = _make_chain(filter, 'filter', true)
   
   def dataframe(*args, **kwargs)
@@ -138,31 +139,81 @@ module Tandem
     pep_keys = ['id', 'pre', 'post', 'start', 'end']
     sep = kwargs.delete('sep') || nil
     pd_kwargs = kwargs.delete('pd_kwargs') || {}
-    f = TD_chain.new(*args, **kwargs)
-    f.each do |item|
-      info = {}
-      item.each do |k, v|
-        if [String, Integer, Float].include?(v.class)
-          info[k] = v
+    Chain.new(*args, **kwargs) do |f|
+      f.each do |item|
+        info = {}
+        item.each do |k, v|
+          if [String, Integer, Float].include?(v.class)
+            info[k] = v
+          end
         end
-      end
-      protein = info['protein'][0]
-  
-      prot_keys.each do |key|
-        vals = item['protein'].map{ |prot| prot[key] }
-        if sep.nil?.!
-          vals = vals.map{ |val| val.nil?.! ? val.to_s : '' }.join(sep)
+        protein = item['protein'][0]
+    
+        prot_keys.each do |key|
+          vals = item['protein'].map{ |prot| prot[key] }
+          if sep.nil?.!
+            vals = vals.map{ |val| val.nil?.! ? val.to_s : '' }.join(sep)
+          end
+          info['protein_' + key] = vals
         end
-        info['peptide_' + key] = vals
+        pep_keys.each do |key|
+          vals = item['protein'].map{ |prot| prot['peptide'][key] }
+          if sep.nil?.!
+            vals = vals.map{ |val| val.nil?.! ? val.to_s : '' }.join(sep)
+          end
+          info['peptide_' + key] = vals
+        end
+        aa = protein['peptide'].delete('aa') || []
+        info['modifications'] = aa.map{ |x| "{#{x}[modified]:.3f}@{#{x}[type]}" }.join(',')
+
+        prot_keys.each do |k|
+          protein.delete(k)
+        end
+        pep_keys.each do |k|
+          protein['peptide'].delete(k)
+        end
+        info.merge!(protein['peptide'])
+        info['scan'] = item['support']['fragment ion mass spectrum']['note']
+        data << info
       end
-      aa = protein['peptide'].delete('aa') || []
-      info.merge!(protein['peptide'])
-      data << info
     end
     Pandas.DataFrame(data, **pd_kwargs)
   end
   
   def filter_df(*args, **kwargs)
-    # Not started
+    sep = kwargs['sep']
+    kwargs['key'] = 'expect' if kwargs.include?('key').!
+    if args.all?{ |arg| arg.instance_of?(Pandas.DataFrame) }
+      if args.size > 1
+        df = Pandas.concat(args)
+      else
+        df = args[0]
+      end
+    else
+      read_kw = kwargs.select{ |k, _| [0, '', nil, false, [], {}].include?(k).! }.select{ |k| ['iterative', 'read_schema', 'sep', 'pd_kwargs'].include?(k) }.map{ |k| [k, kwargs.delete(k)] }.to_h
+      df = dataframe(*args, **read_kw)
+    end
+
+    if kwargs.include?('is_decoy').!
+      if sep.nil?.!
+        if kwargs.include?('decoy_suffix')
+          kwargs['is_decoy'] = df['protein_label'].to_s.split(sep).apply(
+            lambda { |s| s.all{ |x| x.end_with?(kwargs['decoy_suffix']) } })
+        else
+          kwargs['is_decoy'] = df['protein_label'].to_s.split(sep).apply(
+            lambda { |s| s.all?{ |x| x.start_with(kwargs['decoy_prefix'] || 'DECOY_') } })
+        end
+      else
+        if kwargs.include?('decoy_suffix')
+          kwargs['is_decoy'] = df['protein_label'].apply(
+            lambda { |s| s.all?{ |x| x.endswith(kwargs['decoy_suffix']) } })
+        else
+          kwargs['is_decoy'] = df['protein_label'].apply(
+            lambda { |s| s.all?{ |x| x.start_with(kwargs['decoy_prefix'] || 'DECOY_') } })
+        end
+      end
+    end
+
+    Target_decoy::Filter(df, **kwargs)
   end  
 end

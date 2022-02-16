@@ -21,7 +21,7 @@ require 'numpy'
 class TestMzml < Minitest::Test
   def setup
     @maxDiff = nil
-    @path = 'test.mzML'
+    @path = 'tests/test.mzML'
   end
 
   def test_read
@@ -30,8 +30,11 @@ class TestMzml < Minitest::Test
       # for func in [MzML, read, chain,
       #   lambda x, **kw: chain.from_iterable([x], **kw), PreIndexedMzML]:
 
-      r = Mzml::MzML.new(@path, 'read_schema' => rs, 'iterative' => it, 'use_index' => ui)
-      assert_equal Mzml_spectra, r.to_s
+      # r = Mzml::MzML.new(@path, 'read_schema' => rs, 'iterative' => it, 'use_index' => ui)
+      # assert_equal Mzml_spectra, r.to_s
+      r = Mzml::MzMLtest.new(@path)
+      p [37, Mzml_spectra.flatten - r.flatten]
+      assert_equal Mzml_spectra, r
     end
 
   end

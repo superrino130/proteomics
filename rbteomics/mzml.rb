@@ -279,4 +279,113 @@ module Mzml
 
   # # chain = aux._make_chain(read, 'read')
   # @@chain = ChainBase._make_chain(MzXML)
+
+  class MzMLtest < Array
+    def initialize(...)
+      __init__(...)
+    end
+  
+    def __init__(source, *args, **kwargs)
+      self.clear
+      read(source)
+    end
+  
+    def read(source, *args, **kwargs)
+      doc = REXML::Document.new(File.open(source))
+      doc_count = doc.elements['indexedmzML/mzML/run/spectrumList'].attribute('count').value.to_i
+      doc_count.times.map{ self << {} }
+  
+      ex_flg = true
+      sp_cnt = -1
+      sl_cnt = -1
+      sw_cnt = -1
+      t_index = 0
+  
+      IO.foreach(source) do |line|
+        if line.match(/\s*<spectrum /)
+          ex_flg = true
+          sp_cnt += 1
+          sl_cnt = -1
+          sw_cnt = -1
+          t_index = 0
+        elsif ex_flg && sp_cnt >= 0
+          if line.match(/\s*<cvParam /)
+            name = line.match(/name=\"(.*?)\"/)[1]
+            value = getvalue(line.match(/value=\"(.*?)\"/)[1])
+            if t_index == 0
+              self[sp_cnt][name] = value
+            elsif t_index == 1
+              self[sp_cnt]['scanList'][name] = value
+            elsif t_index == 2
+              self[sp_cnt]['scanList']['scan'][sl_cnt][name] = value
+            elsif t_index == 3
+              self[sp_cnt]['scanList']['scan'][sl_cnt]['scanWindowList'][name] = value
+            elsif t_index == 4
+              self[sp_cnt]['scanList']['scan'][sl_cnt]['scanWindowList']['scanWindow'][sw_cnt][name] = value
+            end
+          elsif line.match(/\s*<userParam /)
+            name = line.match(/name=\"(.*?)\"/)[1]
+            value = getvalue(line.match(/value=\"(.*?)\"/)[1])
+            if t_index == 0
+              self[sp_cnt][name] = value
+            elsif t_index == 1
+              self[sp_cnt]['scanList'][name] = value
+            elsif t_index == 2
+              self[sp_cnt]['scanList']['scan'][sl_cnt][name] = value
+            elsif t_index == 3
+              self[sp_cnt]['scanList']['scan'][sl_cnt]['scanWindowList'][name] = value
+            elsif t_index == 4
+              self[sp_cnt]['scanList']['scan'][sl_cnt]['scanWindowList']['scanWindow'][sw_cnt][name] = value
+            end
+          elsif line.match(/\s*<scanList /)
+            t_index += 1
+            count = line.match(/count=\"(.*?)\"/)[1].to_i
+            if self[sp_cnt]['scanList'].!
+              self[sp_cnt]['scanList'] = {'scan' => []}
+              count.times do
+                self[sp_cnt]['scanList']['scan'] << {}
+              end
+            end
+            self[sp_cnt]['scanList']['count'] = count
+          elsif line.match(/\s*<scan /)
+            t_index += 1
+            sl_cnt += 1
+            name = line.match(/scan (.*?)=/)[1]
+            value = getvalue(line.match(/=\"(.*?)\"/)[1])
+            self[sp_cnt]['scanList']['scan'][sl_cnt][name] = value
+          elsif line.match(/\s*<scanWindowList /)
+            t_index += 1
+            count = line.match(/count=\"(.*?)\"/)[1].to_i
+            if self[sp_cnt]['scanList']['scan'][sl_cnt]['scanWindowList'].!
+              self[sp_cnt]['scanList']['scan'][sl_cnt]['scanWindowList'] = {'scanWindow' => []}
+              count.times do
+                self[sp_cnt]['scanList']['scan'][sl_cnt]['scanWindowList']['scanWindow'] << {}
+              end
+            end
+            self[sp_cnt]['scanList']['scan'][sl_cnt]['scanWindowList']['count'] = count
+          elsif line.match('<scanWindow>')
+            t_index += 1
+            sw_cnt += 1
+          elsif line.match('</scanWindow>') || line.match('</scanWindowList>') || line.match('</scan>')
+            t_index -= 1
+          elsif line.match('</scanList>')
+            t_index -= 1
+            ex_flg = false
+          end
+        end
+      end
+      self
+    end
+  
+    def getvalue(value)
+      if value.match(/^\d+\.\d+$/)
+        value.to_f
+      elsif value.match(/^\d+$/)
+        value.to_i
+      else
+        value
+      end
+    end
+  end
+
 end

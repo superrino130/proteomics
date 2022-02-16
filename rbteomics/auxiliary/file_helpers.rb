@@ -214,12 +214,12 @@ class FileReader < IteratorContextManager
     if self.respond_to?(:_source)
       @_source.__exit__(nil, nil, nil)
     end
-    @_source = File_obj.new(@_source_init, @_mode, @_encoding)
+    @_source = File_obj.new(@_source_init, @_mode, encoding: @_encoding)
     begin
       if @_pass_file
-        @_reader = _func(@_source, @_args, @_kwargs)
+        @_reader = @_func(@_source, @_args, @_kwargs)
       else
-        @_reader = _func(@_args, @kwargs)
+        @_reader = @_func(@_args, @kwargs)
       end
     rescue => exception
       @_source.__exit__(exception.message, exception.backtrace)

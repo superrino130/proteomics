@@ -49,10 +49,10 @@ module Xml
   end
   
   module XMLValueConverter
-    def self.duration_str_to_float(s)
+    Duration_str_to_float = lambda do |s|
       if s.star_with?('P').!
         begin
-          return Unitfloat.new(s, 'duration')
+          return UnitFloat.new(s, 'duration')
         rescue => exception
           return Unitstr.new(s, 'duration')
         end
@@ -66,24 +66,24 @@ module Xml
         seconds = matchdict['seconds'].to_f || 0
         minutes += hours * 60.0
         minutes += seconds / 60.0
-        return Unitfloat.new(minutes, 'minute')
+        return UnitFloat.new(minutes, 'minute')
       else
         return Unitstr.new(s, 'duration')
       end
     end
   
-    def self.str_to_bool(s)
+    Str_to_bool = lambda do |s|
       return true if ['true', '1', 'y'].include?(s.downcase)
       return false if ['false', '0', 'n'].include?(s.downcase)
       raise PyteomicsError.new('Cannot convert string to bool: ' + s)
     end
   
-    def str_to_num(s, numtype)
+    str_to_num = lambda do |s, numtype|
       ['', nil].include?(s).! ? numtype(s) : nil
     end
   
     def self.to(t)
-      def convert_from(s)
+      convert_from = lambda do |s|
         return str_to_num(s, t)
       end
       convert_from
@@ -91,13 +91,13 @@ module Xml
   
     def self.converters
       return {
-        'ints': self.to(Unitint),
-        'floats': self.to(Unitfloat),
-        'bools': self.str_to_bool,
-        'intlists': lambda { |x| Numpy.fromstring(x.replace('\n', ' '), dtype: int, sep: ' ') },
-        'floatlists': lambda { |x| Numpy.fromstring(x.replace('\n', ' '), sep: ' ') },
-        'charlists': list,
-        'duration': duration_str_to_float
+        'ints' => self.to(Unitint),
+        'floats' => self.to(UnitFloat),
+        'bools' => Str_to_bool,
+        'intlists' => lambda { |x| Numpy.fromstring(x.replace('\n', ' '), dtype: int, sep: ' ') },
+        'floatlists' => lambda { |x| Numpy.fromstring(x.replace('\n', ' '), sep: ' ') },
+        'charlists' => [],
+        'duration' => Duration_str_to_float
       }
     end
   end
@@ -109,7 +109,7 @@ module Xml
       @sxmlparam = sxmlparam
     end
   end
-  
+
   class XML < FileReader
     @@_element_handlers = {}
   
@@ -121,7 +121,7 @@ module Xml
       raise NotImplementedError
     end
   
-    def __init___(source, **kwargs)
+    def __init__(source, **kwargs)
       @file_format = 'XML'
       @_root_element = nil
       @_default_schema = {}
@@ -132,7 +132,7 @@ module Xml
       @_structures_to_flatten = []
       @_schema_location_param = 'schemaLocation'
       @_default_id_attr = 'id'
-      @_huge_tree =false
+      @_huge_tree = false
       @_retrieve_refs_enabled = nil
       @_iterative = true
       @_converters = XMLValueConverter.converters()
@@ -141,7 +141,7 @@ module Xml
       iterative = kwargs['iterative'] || nil
       build_id_cache = kwargs['build_id_cache'] || false
   
-      super(source, 'mode' => 'rb', 'parser_func' => iterfind, 'pass_file' => false,
+      super(source, 'mode' => 'rb', 'parser_func' => @iterfind, 'pass_file' => false,
         'args' => [@_default_iter_path || @_default_iter_tag], 'kwargs' => kwargs)
       iterative = @_iterative if iterative.nil?
       if iterative.nil?.!
@@ -407,7 +407,7 @@ module Xml
       raise NotImplementedError("_retrieve_refs is not implemented for #{self.class}. Do not use `retrieve_refs=True`.")
     end
   
-    def iterfind(path, **kwargs)
+    @iterfind = lambda do |path, **kwargs|
       Iterfind.new(path, **kwargs)
     end
   
