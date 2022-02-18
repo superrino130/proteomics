@@ -6,40 +6,40 @@ require 'numpy'
 # import itertools as it
 # import sys
 # from . import auxiliary as aux
-require_relative 'rbteomics/auxiliary/structures'
-require_relative 'rbteomics/auxiliary/file_helpers'
+require_relative 'auxiliary/structures'
+require_relative 'auxiliary/file_helpers'
 
 require 'set'
 
 class MGFBase
   attr_reader :_comments
-  def initialize(...)
-    @_comments = Set.new('#;!/'.split(''))
-    @_array = lambda { |x, dtype| Numpy.array(x, dtype: dtype) }
-    @_ma = lambda { |x, dtype| Numpy.ma.masked_equal(Numpy.array(x, dtype: dtype), 0) }
-    @_identity = lambda { |x, **kw| x }
-    @_array_converters = {
-        'm/z array' => [@_identity, @_array, @_array],
-        'intensity array' => [@_identity, @_array, @_array],
-        'charge array' => [@_identity, @_array, @_ma],
-        'ion array' => [@_identity, @_array,  @_array]
-    }
-    @_array_keys = ['m/z array', 'intensity array', 'charge array', 'ion array']
-    @_array_keys_unicode = ['m/z array', 'intensity array', 'charge array', 'ion array']
-    @encoding = nil
 
+  @@_comments = Set.new('#;!/'.split(''))
+  @@_array = lambda { |x, dtype| Numpy.array(x, dtype: dtype) }
+  @@_ma = lambda { |x, dtype| Numpy.ma.masked_equal(Numpy.array(x, dtype: dtype), 0) }
+  @@_identity = lambda { |x, **kw| x }
+  @@_array_converters = {
+      'm/z array' => [@_identity, @_array, @_array],
+      'intensity array' => [@_identity, @_array, @_array],
+      'charge array' => [@_identity, @_array, @_ma],
+      'ion array' => [@_identity, @_array,  @_array]
+  }
+  @@_array_keys = ['m/z array', 'intensity array', 'charge array', 'ion array']
+  @@_array_keys_unicode = ['m/z array', 'intensity array', 'charge array', 'ion array']
+  @@encoding = nil
+
+  def initialize(...)
     __init__(...)
   end
 
-  def __init__(source: nil, **kwargs)
-    super
+  def __init__(source, **kwargs)
     @_use_header = kwargs.delete('use_header') || true
     @_convert_arrays = kwargs.delete('convert_arrays') || 2
     @_read_charges = kwargs.delete('read_charges') || true
     @_read_ions = kwargs.delete('read_ions') || false
     @_read_charges = false if @_read_ions
     dtype = kwargs.delete('dtype') || nil
-    @_dtype_dict = dtype.instance_of?(Hash) ? dtype : @_array_keys.map{ [_1.to_s, dtype] }.to_h
+    @_dtype_dict = dtype.instance_of?(Hash) ? dtype : @@_array_keys.map{ [_1.to_s, dtype] }.to_h
     if @_use_header
       _read_header()
     else
@@ -121,7 +121,7 @@ class MGFBase
         data['charge array'] = charges if @_read_charges
         data['ion array'] = ions if @_read_ions
         data.each do |key, value|
-          out[key] = @_array_converters[key][@_convert_arrays](values, dtype: @_dtype_dict[key])
+          out[key] = @_array_converters[key][@_convert_arrays].call(values, dtype: @_dtype_dict[key])
         end
         out
       else
@@ -162,26 +162,41 @@ class MGFBase
       raise PyteomicsError.new('RT information not found.')      
     end
   end
+
+  def method_missing(method, ...)
+    'dummy'
+  end
 end
 
-class IndexedMGF < MGFBase
-  include IndexSavingTextReader
-  include TimeOrderedIndexedReaderMixin
-  include TaskMappingMixin
+class IndexedMGF
+  @@delimiter = 'BEGIN IONS'
 
   def initialize(...)
-    @delimiter = 'BEGIN IONS'
-
     __init__(...)
   end
 
-  def __init__(source: nil, use_header: true, convert_arrays: 2, read_charges: true,
-    dtype: nil, encoding: 'utf-8', index_by_scans: false, read_ions: false, _skip_index: false, **kwargs)
-    @label = index_by_scans ? 'SCANS=(\d+)\s*' : 'TITLE=([^\n]*\S)\s*'
-    super(source, 'parser_func' => _read, 'pass_file' => false, 'args' => [], 'kwargs' => {},
-    'use_header' => use_header, 'convert_arrays' => convert_arrays,
-    'read_charges' => read_charges, 'dtype' => dtype, 'encoding' => encoding,
-    'read_ions' => read_ions, '_skip_index' => _skip_index, **kwargs)
+  def __init__(source, **kwargs)
+    kwargs['use_header'] ||= true
+    kwargs['convert_arrays'] ||= 2
+    kwargs['read_charges'] ||= true
+    kwargs['dtype'] ||= nil
+    kwargs['encoding'] ||= 'utf-8'
+    kwargs['index_by_scans'] ||= false
+    kwargs['read_ions'] ||= false
+    kwargs['_skip_index'] ||= false
+
+    kwargs['parser_func'] = Read
+    kwargs['pass_file'] = false
+    kwargs['args'] = []
+    kwargs['kwargs'] = {}
+    
+    @label = kwargs['index_by_scans'] ? 'SCANS=(\d+)\s*' : 'TITLE=([^\n]*\S)\s*'
+
+    @c1 = SimpleDelegator.new(MGFBase).new(source, **kwargs)
+    @c2 = SimpleDelegator.new(IndexSavingTextReader).new(source, **kwargs)
+    @c3 = SimpleDelegator.new(TimeOrderedIndexedReaderMixin).new(source, **kwargs)
+    @c4 = SimpleDelegator.new(TaskMappingMixin).new(source, **kwargs)
+    @k = [@c1, @c2, @c3, @c4]
   end
 
   def __reduce_ex__(protocol)
@@ -192,7 +207,12 @@ class IndexedMGF < MGFBase
   end
 
   def __getstate__
-    state = super
+    @k.each do |obj|
+      if obj.resupond_to(__getstate__)
+        state = obj.__getstate__
+        break
+      end
+    end
     state['use_header'] = @_use_header
     state['header'] = @_header
     state['read_ions'] = @_read_ions
@@ -200,7 +220,12 @@ class IndexedMGF < MGFBase
   end
 
   def __setstate__(state)
-    super
+    @k.each do |obj|
+      if obj.resupond_to(__setstate__)
+        obj.__setstate__(state)
+        break
+      end
+    end
     @_header = state['header']
     @_use_header = state['use_header']
     @_read_ions = state['read_ions']
@@ -223,7 +248,7 @@ class IndexedMGF < MGFBase
     _read_spectrum_lines(lines)
   end
 
-  def _read(**kwargs)
+  Read = lambda do |**kwargs|
     @_offset_index.each do |_, offsets|
       spectrum = _item_from_offsets(offsets)
       yield spectrum
@@ -235,19 +260,40 @@ class IndexedMGF < MGFBase
   end
 end
 
-class MGF < MGFBase
-  include FileReader
-
+class MGF
   def initialize(...)
     __init__(...)
   end
 
-  def __init__(source: nil, use_header: true, convert_arrays: 22, read_charges: true,
-    read_ions: false, dtype: nil, encoding: nil)
+  def __init__(source, **kwargs)
+    kwargs['use_header'] ||= true
+    kwargs['convert_arrays'] ||= 22
+    kwargs['read_charges'] ||= true
+    kwargs['read_ions'] ||= false
+    kwargs['dtype'] ||= nil
+    kwargs['encoding'] ||= nil
 
-    super(source, 'mode' => 'r', 'parser_func' => _read, 'pass_file' => false, 'args' => [], 'kwargs' => {},
-    'encoding' => encoding, 'use_header' => use_header, 'convert_arrays' => convert_arrays, 'read_charges' => read_charges,
-    'read_ions' => read_ions, 'dtype' => dtype)
+    kwargs['mode'] = 'r'
+    kwargs['parser_func'] = Read
+    kwargs['pass_file'] = false
+    kwargs['args'] = []
+    kwargs['kwargs'] = {}
+
+    @c1 = SimpleDelegator.new(MGFBase).new(source, **kwargs)
+    @c2 = SimpleDelegator.new(FileReader).new(source, **kwargs)
+    @k =  [@c1, @c2]
+  end
+
+  def method_missing(method, ...)
+    @k.each do |x|
+      if x.respond_to?(method)
+        return x.method(method).call(...)
+      else
+        if x.method_missing(method, ...) != 'dummy'
+          return x.method_missing(method, ...)
+        end
+      end
+    end
   end
 
   # @aux._keepstate_method
@@ -259,7 +305,7 @@ class MGF < MGFBase
     _read_spectrum_lines(@_source)
   end
 
-  def _read
+  Read = lambda do
     @_source.each do |line|
       if line.strip == 'BEGIN IONS'
         yield _read_spectrum()

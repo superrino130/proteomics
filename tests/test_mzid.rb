@@ -6,7 +6,7 @@ require_relative 'data'
 class TestMzid < Minitest::Test
   def setup
     @maxDiff = nil
-    @path = 'test.mzid'
+    @path = 'tests/test.mzid'
   end
   
   def test_ReadPSM
@@ -22,17 +22,15 @@ class TestMzid < Minitest::Test
   end
 
   def test_map
-    mz = MZID::MzIdentML.new(@path).to_enum
+    mz = Mzid::MzIdentML.new(@path)
+    p Mzid_spectra[[true, true]].size
 
+    p mz.map
     cnt = 0
     loop do
       mz.next
       cnt += 1
     end
     assert_equal Mzid_spectra[[true, true]].size, MZID::MzIdentML.new(@path).size
-  end
-
-  def test_iterfind_map
-
   end
 end

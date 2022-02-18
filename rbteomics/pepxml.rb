@@ -6,15 +6,12 @@ require_relative 'auxiliary/file_helpers'
 require_relative 'auxiliary/target_decoy'
 require_relative '_schema_defaults'
 require 'set'
+require 'delegate'
 
 module Pepxml
+  module_function
   class PepXML
-    # class PepXML < IndexedXML
-      # prepend IndexSavingMixin
-      # include TaskMappingMixin
-      #class PepXML(xml.MultiProcessingXML, xml.IndexSavingXML):
-      #class MultiProcessingXML(IndexedXML, TaskMappingMixin):
-      #class IndexSavingXML(IndexSavingMixin, IndexedXML):
+  #class PepXML(xml.MultiProcessingXML, xml.IndexSavingXML):
     @@file_format = 'pepXML'
     @@_root_element = 'msms_pipeline_analysis'
     @@_default_schema = Pepxml_schema_defaults
@@ -32,15 +29,14 @@ module Pepxml
     }
     
     def initialize(...)
-      @_index_class = HierarchicalOffsetIndex.new
-    
-      @mpx = XML::MultiProcessingXML.new(...)
-      @isx = XML::IndexSavingXML.new(...)
       __init__(...)
     end
     
-    def __init__(source, **kwargs)
-      super
+    def __init__(...)
+      @_index_class = HierarchicalOffsetIndex.new
+    
+      @mpx = SimpleDelegator.new(Xml::MultiProcessingXML).new(...)
+      @isx = SimpleDelegator.new(Xml::IndexSavingXML).new(...)
     end
   
       # # from class IndexSavingXML
@@ -163,13 +159,13 @@ module Pepxml
       info
     end
     
-    def method_missing(name, *args)
-      [@mpx, @isx].each do |x|
-        if x.respond_to?(name)
-          return x.method(name)
+    def method_missing(method, ...)
+      [@mpx, @isx].each do |obj|
+        if obj.respond_to?(method)
+          return obj.method(method).call(...)
         end
       end
-      raise NoMethodError.new(name)
+      raise "NoMethod in #{self.class} called #{method}"
     end
   end
     
@@ -235,7 +231,7 @@ module Pepxml
   # Filter.chain = _make_chain(Filter, 'filter', true)
   
   def DataFrame(*args, **kwargs)
-    import Pandas
+    require 'pandas'
     kwargs = kwargs.dup
     sep = kwargs.pop('sep', None)
     pd_kwargs = kwargs.pop('pd_kwargs', {})

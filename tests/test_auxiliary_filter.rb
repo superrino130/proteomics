@@ -55,10 +55,10 @@ class TestFDR < Minitest::Test
     assert_equal f11.shape[0], 21
     assert_equal f12.shape[0], 21
 
-    Target_decoy::filter(*args, key=key, fdr=0.02, full_output=False, **kwargs) do |f|
+    Target_decoy::filter(*args, 'key' => @key, 'fdr' => 0.02, 'full_output' => false, **kwargs) do |f|
       assert_equal f.to_a.size, 21
     end
-    Target_decoy::filter(*args, fdr=0.02, full_output=False, **kwargs) do |f|
+    Target_decoy::filter(*args, 'fdr' => 0.02, 'full_output' => false, **kwargs) do |f|
       assert_equal f12.to_a.size, 21
     end
   end
@@ -66,6 +66,4 @@ class TestFDR < Minitest::Test
   def test_filter
     _run_check(@psms)
   end
-
-
 end

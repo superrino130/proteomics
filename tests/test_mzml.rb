@@ -24,18 +24,31 @@ class TestMzml < Minitest::Test
     @path = 'tests/test.mzML'
   end
 
-  def test_read
-    [true, false].repeated_permutation(3) do |rs, it, ui|
-      next if rs
+  # def test_read
+  #   [true, false].repeated_permutation(3) do |rs, it, ui|
+  #     next if rs
       # for func in [MzML, read, chain,
       #   lambda x, **kw: chain.from_iterable([x], **kw), PreIndexedMzML]:
 
       # r = Mzml::MzML.new(@path, 'read_schema' => rs, 'iterative' => it, 'use_index' => ui)
       # assert_equal Mzml_spectra, r.to_s
-      r = Mzml::MzMLtest.new(@path)
-      p [37, Mzml_spectra.flatten - r.flatten]
-      assert_equal Mzml_spectra, r
-    end
+    #   r = Mzml::MzMLtest.new(@path)
+    #   assert_equal Mzml_spectra, r
+    # end
 
+  # end
+
+  def test_mp_read
+    key = Itemgetter.new('index')
+    f = Mzml::MzMLtest.new(@path)
+    assert_equal Mzml_spectra.to_a.sort_by{ _1[key] }, f.map().to_a.sort_by{ _1[key] }
   end
+
+  def test_mp_requires_index
+    r = Mzml::MzMLtest.new(@path, 'use_index' => false)
+    p [49, r.map]
+    assert r.map
+  end
+
+
 end

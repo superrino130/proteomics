@@ -172,10 +172,11 @@ module Target_decoy
     ]
     
     if full
-      dtypes = Set.new(args.map{ getattr(_1, 'dtype', nil) })
+      # dtypes = Set.new(args.map{ getattr(_1, 'dtype', nil) })
+      dtypes = Set.new(args.map{ _1.respond_to?('dtype') ? _1.dtype : nil })
       if dtypes.size == 1 || dtypes.all?{ _1 }
-        psm_dtype = dtype.to_a[-1]
-        dtype.delete(dtype.to_a[-1])
+        psm_dtype = dtypes.to_a[-1]
+        dtypes.delete(dtypes.to_a[-1])
       else
         psm_dtype = Numpy.object_
       end
@@ -187,13 +188,14 @@ module Target_decoy
   end
   
   Make_qvalues = lambda do |read, is_decoy_prefix, is_decoy_suffix, key|
+    @read = read
     @mq_is_decoy_prefix = is_decoy_prefix
     @mq_key = key
     @mqvalues = lambda do |*args, **kwargs|
       #@_keepstate
       def get_scores(*args, **kwargs)
         scores = []
-        File.open(*args) do |f|
+        @read.call(*args, **kwargs) do |f|
           f.each_with_index do |psm, i|
             row = []
             [keyf, isdecoy].each do |func|
@@ -262,12 +264,12 @@ module Target_decoy
       arr_flag = false
       psms = nil
   
-      if args.empty?.! && args.map{ _1.is_a?(Pandas.DataFrame) }.all?
+      if args.empty?.! && args.all?{ _1.is_a?(Pandas::DataFrame) }
         psms = Pandas.concat(args)
         return _qvalues_df(psms, keyf, isdecoy, **kwargs)
       end
   
-      if args.empty?.! && args.map{ _1.instance_of?(Numpy.ndarray)}.all?{ _1 }.!
+      if args.empty?.! && args.all?{ _1.is_a?(Numpy.ndarray)}.!
         keyf = Itemgetter.new(keyf) if keyf.instance_of?(String)
         isdecoy = Itemgetter.new(isdecoy) if isdecoy.instance_of?(String)
         peps = Itemgetter.new(peps) if peps.instance_of?(String)
@@ -277,14 +279,14 @@ module Target_decoy
         kwargs.delete('full_output')
         scores = Numpy.array(get_scores(*args, **kwargs), dtype: dtype)
       else
-        if args.map{ _1.instance_of?(Numpy.ndarray) }.all?{ _ 1 }
+        if args.all?{ _1.instance_of?(Numpy.ndarray) }
           psms = Numpy.concatenate(args)
         end
-        if keyf.instance_of?(String).!
+        if keyf.instance_of?(BaseString).!
           keyf = Numpy.array(keyf)
           arr_flag = true
         end
-        if isdecoy.instance_of?(String).!
+        if isdecoy.instance_of?(BaseString).!
           isdecoy = Numpy.array(isdecoy)
           arr_flag = true
         end
@@ -292,7 +294,7 @@ module Target_decoy
         if arr_flag
           scores = Numpy.empty(hasattr(keyf, 'size') ? keyf.size : isdecoy.size, dtype=dtype)
           [keyf, isdecoy].zip([score_label, decoy_or_pep_label]).each do |func, label|
-            if func.instance_of?(String).!
+            if func.instance_of?(BaseString).!
               scores[label] = func
             else
               scores[label] = psms[func]

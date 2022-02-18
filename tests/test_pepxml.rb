@@ -26,15 +26,15 @@ class TestPepxml < Minitest::Test
       r = Pepxml::PepXML.new(@path, 'read_schema' => rs, 'iterative' => it)
       assert_equal r, Pepxml_results
     end
-    [true, false].repeated_permutation(2).each do |rs, it|
-      r = Pepxml.read(@path, 'read_schema' => rs, 'iterative' => it)
-      assert_equal r, Pepxml_results
-    end
-    [true, false].repeated_permutation(2).each do |rs, it|
-      r = Pepxml.chain(@path, 'read_schema' => rs, 'iterative' => it)
-      assert_equal r, Pepxml_results
-    end
-    [true, false].repeated_permutation(2).each do |rs, it|
+    # [true, false].repeated_permutation(2).each do |rs, it|
+    #   r = Pepxml.read(@path, 'read_schema' => rs, 'iterative' => it)
+    #   assert_equal r, Pepxml_results
+    # end
+    # [true, false].repeated_permutation(2).each do |rs, it|
+    #   r = Pepxml.chain(@path, 'read_schema' => rs, 'iterative' => it)
+    #   assert_equal r, Pepxml_results
+    # end
+    # [true, false].repeated_permutation(2).each do |rs, it|
       # [PepXML].each do |func|
       # [PepXML.new, read, chain,
       #   lambda { |x, **kw| chain },
@@ -43,6 +43,6 @@ class TestPepxml < Minitest::Test
         # r = Pepxml.read(@path, 'read_schema' => rs, 'iterative' => it)
         # assert_equal r, Pepxml_results
       # end
+  # end
   end
-end
 end

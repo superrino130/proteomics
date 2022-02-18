@@ -1,15 +1,10 @@
-# import sys
 # import codecs
-# import re
 # from functools import wraps
 # from contextlib import contextmanager
 # from collections import OrderedDict, defaultdict
-# import json
 require 'json'
 # import multiprocessing as mp
 # import threading
-# import warnings
-# import os
 # from abc import ABCMeta
 
 BaseString ||= String
@@ -93,7 +88,8 @@ class File_obj
       @file = {'r' => 'gets', 'a' => 'puts', 'w' => 'warn'}[mode[0]]
       @_file_spec = nil
     elsif f.instance_of?(BaseString)
-      @file = File.open(f, mode)
+      # @file = File.open(f, mode)
+      @file = File.open(f)
       @file.set_encoding(encoding) if encoding.nil?.!
       @_file_spec = f
     else
@@ -134,14 +130,17 @@ class File_obj
   end
 end
 
-module NoOpBaseReader
-  def __init__(*args, **kwargs)
+class NoOpBaseReader
+  def initialize(...)
+    __init__(...)
+  end
+
+  def __init__(...)
     # PASS
   end
 end
 
-class IteratorContextManager
-  include NoOpBaseReader
+class IteratorContextManager < NoOpBaseReader
   def initialize(...)
     __init__(...)
   end
@@ -217,9 +216,9 @@ class FileReader < IteratorContextManager
     @_source = File_obj.new(@_source_init, @_mode, encoding: @_encoding)
     begin
       if @_pass_file
-        @_reader = @_func(@_source, @_args, @_kwargs)
+        @_reader = @_func.call(@_source, @_args, **@_kwargs)
       else
-        @_reader = @_func(@_args, @kwargs)
+        @_reader = @_func.call(*@_args, **@_kwargs)
       end
     rescue => exception
       @_source.__exit__(exception.message, exception.backtrace)
@@ -237,15 +236,17 @@ class FileReader < IteratorContextManager
     end
     return @_source.respond_to?(:attr)
   end
+
+  def method_missing(method, ...)
+    'dummy'
+  end
 end
 
 def remove_bom(bstr)
   bstr.gsub(/\xFE\xFF|\xFF\xFE/n,"").gsub(/\xFE\xFF|\xFF\xFE/n,"").gsub!(/\x00$/, '')
 end
 
-module IndexedReaderMixin
-  include NoOpBaseReader
-
+class IndexedReaderMixin < NoOpBaseReader
   attr_reader :_offset_index
   
   def index
@@ -327,6 +328,10 @@ module IndexedReaderMixin
     end
     raise PyteomicsError.new("Unsupported query key: #{key}")
   end
+
+  def method_missing(method, ...)
+    'dummy'
+  end
 end
 
 class RTLocator
@@ -399,8 +404,7 @@ class RTLocator
   end
 end
 
-class TimeOrderedIndexedReaderMixin
-  include IndexedReaderMixin
+class TimeOrderedIndexedReaderMixin < IndexedReaderMixin
 
   #@property
   def time
@@ -422,20 +426,22 @@ class TimeOrderedIndexedReaderMixin
   end
 end
 
-class IndexedTextReader < FileReader
-  include IndexedReaderMixin
+class IndexedTextReader
+  @@delimiter = nil
+  @@label = nil
+  @@block_size = 1000000
+  @@label_group = 1
 
   def initialize(...)
-    @delimiter = nil
-    @label = nil
-    @block_size = 1000000
-    @label_group = 1
     __init__(...)
   end
 
   def __init__(source, **kwargs)
     encoding = kwargs.delete('encoding') || 'utf-8'
-    super(source, 'mode' => 'rb', 'encoding' => nil, **kwargs)
+
+    @c1 = SimpleDelegator.new(FileReader).new(source, 'mode' => 'rb', 'encoding' => nil, **kwargs)
+    @c2 = SimpleDelegator.new(IndexedReaderMixin).new(source, 'mode' => 'rb', 'encoding' => nil, **kwargs)
+    @k =  [@c1, @c2]
     @encoding = encoding
     ['delimiter', 'label', 'block_size', 'label_group'].each do |attr|
       if kwargs.include?(attr)
@@ -449,18 +455,19 @@ class IndexedTextReader < FileReader
   end
 
   def __getstate__
-    state = super
+    state = @c1.__getstate__ || @c2.__getstate__
     state['offset_index'] = @_offset_index
     state
   end
 
   def __setstate__(state)
-    super
+    @c1.__setstate__(state)
+    @c2.__setstate__(state)
     @_offset_index = state['offset_index']
   end
 
   def _chunk_iterator
-    # 未実装
+    # Not started
   end
 
   def _generate_offsets
@@ -500,10 +507,21 @@ class IndexedTextReader < FileReader
     lines = @_source.read(_end - start).decode(@encoding).split('\n')
     lines
   end
+
+  def method_missing(method, ...)
+    @k.each do |x|
+      if x.respond_to?(method)
+        return x.method(method).call(...)
+      else
+        if x.method_missing(method, ...) != 'dummy'
+          return x.method_missing(method, ...)
+        end
+      end
+    end
+  end
 end
 
-module IndexSavingMixin
-  include NoOpBaseReader
+class IndexSavingMixin < NoOpBaseReader
   @@_index_class = NotImplementedError
 
   #property
@@ -738,9 +756,30 @@ class OffsetIndex
   end
 end
 
-class IndexSavingTextReader < IndexedTextReader
-  prepend IndexSavingMixin
+class IndexSavingTextReader
   @@_index_class = OffsetIndex
+
+  def initialize(...)
+    __init__(...)
+  end
+
+  def __init__(...)
+    @c1 = SimpleDelegator.new(IndexSavingMixin).new(...)
+    @c2 = SimpleDelegator.new(IndexedTextReader).new(...)
+    @k =  [@c1, @c2]
+  end
+
+  def method_missing(method, ...)
+    @k.each do |x|
+      if x.respond_to?(method)
+        return x.method(method).call(...)
+      else
+        if x.method_missing(method, ...) != 'dummy'
+          return x.method_missing(method, ...)
+        end
+      end
+    end
+  end
 end
 
 class HierarchicalOffsetIndex
@@ -993,8 +1032,7 @@ end
 QUEUE_TIMEOUT = 4
 QUEUE_SIZE = 1e7.to_i
 
-class TaskMappingMixin
-  include NoOpBaseReader
+class TaskMappingMixin < NoOpBaseReader
   def initialize(...)
     __init__(...)
   end
@@ -1131,8 +1169,8 @@ class ChainBase
     @_iterator = nil
   end
 
-  def self.from_iterable(sources, **kwargs)
-    self.new(*sources, **kwargs)
+  def self.from_iterable(cls, sources, **kwargs)
+    cls.new(*sources, **kwargs)
   end
 
   def self._make_chain(sequence_maker)

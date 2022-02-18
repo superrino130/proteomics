@@ -141,8 +141,8 @@ module Xml
       iterative = kwargs['iterative'] || nil
       build_id_cache = kwargs['build_id_cache'] || false
   
-      super(source, 'mode' => 'rb', 'parser_func' => @iterfind, 'pass_file' => false,
-        'args' => [@_default_iter_path || @_default_iter_tag], 'kwargs' => kwargs)
+      super(source, 'mode' => 'rb', 'parser_func' => Set_Iterfind, 'pass_file' => false,
+        'args' => (@_default_iter_path || @_default_iter_tag), 'kwargs' => kwargs)
       iterative = @_iterative if iterative.nil?
       if iterative.nil?.!
         @_tree = nil
@@ -159,7 +159,7 @@ module Xml
       if read_schema.nil?.!
         @_read_schema = read_schema
       end
-      @schema_info = _get_schema_info(read_schema)
+      @schema_info = _get_schema_info(read_schema: read_schema)
   
       @_converters_items = @_converters
       @_huge_tree = kwargs['huge_tree'] || @_huge_tree
@@ -187,12 +187,12 @@ module Xml
   
     #@_keepstate
     def _get_version_info
-      etree.iterparse(@_source, 'events' => ['start'], 'remove_comments' => true, 'huge_tree' => @_huge_tree).each do |_, elem|
-        if _local_name(elem) == @_root_element
-          return [elem.attrib.get('version'),
-          elem.attrib.get(elem.nsmap.include?('xis') ? '{{{}}}'.format(elem.nsmap['xsi']) : '') + @_schema_location_param]
-        end
-      end
+      # etree.iterparse(@_source, 'events' => ['start'], 'remove_comments' => true, 'huge_tree' => @_huge_tree).each do |_, elem|
+      #   if _local_name(elem) == @_root_element
+      #     return [elem.attrib.get('version'),
+      #     elem.attrib.get(elem.nsmap.include?('xis') ? '{{{}}}'.format(elem.nsmap['xsi']) : '') + @_schema_location_param]
+      #   end
+      # end
     end
   
     #@_keepstate
@@ -407,7 +407,7 @@ module Xml
       raise NotImplementedError("_retrieve_refs is not implemented for #{self.class}. Do not use `retrieve_refs=True`.")
     end
   
-    @iterfind = lambda do |path, **kwargs|
+    Set_Iterfind = lambda do |path, **kwargs|
       Iterfind.new(path, **kwargs)
     end
   
@@ -546,6 +546,10 @@ module Xml
     def version_info
       # PASS
     end
+
+    def method_missing(method, ...)
+      'dummy'
+    end
   end
   
   Pattern_path = Regexp.compile('([\w/*]*)(.*)')
@@ -661,9 +665,7 @@ module Xml
     OrderedDict(all_records)
   end
   
-  class IndexedXML < XML
-    prepend IndexedReaderMixin
-
+  class IndexedXML
     @@_indexed_tags = Set.new
     @@_indexed_tag_keys = {}
     @@_use_index = true
@@ -673,9 +675,11 @@ module Xml
     end
   
     def __init__(source, *args, **kwargs)
-      read_schema = kwargs['read_schema'] || false
-      iterative = kwargs['iterative'] || true
-      build_id_cache = kwargs['build_id_cache'] || false
+      # kwargs = kwargs.dup
+      kwargs['read_schema'] ||= false
+      kwargs['iterative'] ||= true
+      kwargs['build_id_cache'] ||= false
+      build_id_cache = kwargs['build_id_cache']
       use_index = kwargs['use_index'] || nil
       tags = kwargs['indexed_tags']
       tag_index_keys = kwargs['indexed_tag_keys']
@@ -690,7 +694,9 @@ module Xml
           warn('_default_iter_path differs from _default_iter_tag and index is enabled. _default_iter_tag will be used in the index, mind the consequences.')
         end
       end
-      super(source, read_schema, iterative, build_id_cache, *args, **kwargs)
+      @c1 = SimpleDelegator.new(IndexedReaderMixin).new(source, *args, **kwargs)
+      @c2 = SimpleDelegator.new(XML).new(source, *args, **kwargs)
+      @k =  [@c1, @c2]      
   
       @_offset_index = nil
       _build_index()
@@ -708,7 +714,12 @@ module Xml
     end
   
     def __getstate__
-      state = super
+      @k.each do |obj|
+        if obj.respond_to?(:__getstate__)
+          state = obj.__getstate__
+          break
+        end
+      end
       state['_indexed_tags'] = @_indexed_tags
       state['_indexed_tag_keys'] = @_indexed_tag_keys
       state['_use_index'] = @_use_index
@@ -717,7 +728,12 @@ module Xml
     end
   
     def __setstate__(state)
-      super
+      @k.each do |obj|
+        if obj.respond_to?(:__setstate__)
+          obj.__setstate__
+          break
+        end
+      end
       @_indexed_tags = state['_indexed_tags']
       @_indexed_tag_keys = state['_indexed_tag_keys']
       @_use_index = state['_use_index']
@@ -764,7 +780,7 @@ module Xml
       @_offset_index[@_default_iter_tag].include?(key)
     end
   
-    def __len__
+    def size
       @_offset_index[@_default_iter_tag].size
     end
   
@@ -774,35 +790,70 @@ module Xml
       end
       Iterfind.new(path, **kwargs)
     end
+
+    def method_missing(method, ...)
+      @k.each do |x|
+        if x.respond_to?(method)
+          return x.method(method).call(...)
+        else
+          if x.method_missing(method, ...) != 'dummy'
+            return x.method_missing(method, ...)
+          end
+        end
+      end
+    end
   end
   
-  class MultiProcessingXML < IndexedXML
-  
+  class MultiProcessingXML
     def initialize(...)
-      @tmmixin = TaskMappingMixin.new(...)
       __init__(...)
     end
 
-    def __init__(source, *args, **kwargs)
-      super
+    def __init__(...)
+      @c1 = SimpleDelegator.new(IndexedXML).new(...)
+      @c2 = SimpleDelegator.new(TaskMappingMixin).new(...)
+      @k = [@c1, @c2]
     end
   
     def _task_map_iterator
       @_offset_index[self._default_iter_tag].to_enum
     end
   
-    def method_missing(name, *args)
-      if @tmmixin.respond_to?(name)
-        raise NoMethodError.new(name)
+    def method_missing(method, ...)
+      @k.each do |x|
+        if x.respond_to?(method)
+          return x.method(method).call(...)
+        else
+          if x.method_missing(method, ...) != 'dummy'
+            return x.method_missing(method, ...)
+          end
+        end
       end
     end
   end
   
-  class IndexSavingXML < IndexedXML
-    prepend IndexSavingMixin
-    
+  class IndexSavingXML
     def initialize(...)
+      __init__(...)
+    end
+    
+    def __init__(...)
       @_index_class = HierarchicalOffsetIndex.new
+      @c1 = SimpleDelegator.new(IndexSavingMixin).new(...)
+      @c2 = SimpleDelegator.new(IndexedXML).new(...)
+      @k =  [@c1, @c2]
+    end
+  
+    def method_missing(method, ...)
+      @k.each do |x|
+        if x.respond_to?(method)
+          return x.method(method).call(...)
+        else
+          if x.method_missing(method, ...) != 'dummy'
+            return x.method_missing(method, ...)
+          end
+        end
+      end
     end
   
     def _read_byte_offsets
@@ -943,17 +994,14 @@ module Xml
   end
   
   class IndexedIterfind
-  # class IndexedIterfind < Iterfind
-  #     prepend TaskMappingMixin
-    
     def initialize(...)
       __init__(...)
     end
   
-    def __init__(parser, tag_name, **kwargs)
-      super
-      @tmmixin = TaskMappingMixin.new(**kwargs)
-      @ifind = Iterfind.new(parser, tag_name, **kwargs)
+    def __init__(...)
+      @c1 = TaskMappingMixin.new(...)
+      @c2 = Iterfind.new(...)
+      @k = [@c1, @c2]
     end
   
     def _task_map_iterator
@@ -1009,11 +1057,15 @@ module Xml
       @index.size
     end
   
-    def method_missing(name, *args)
-      [@tmmixin, @ifind].each do |x|
-        if x.respond_to?(name)
-          raise NoMethodError.new(name)
-        end  
+    def method_missing(method, ...)
+      @k.each do |x|
+        if x.respond_to?(method)
+          return x.method(method).call(...)
+        else
+          if x.method_missing(method, ...) != 'dummy'
+            return x.method_missing(method, ...)
+          end
+        end
       end
     end
   end
