@@ -15,6 +15,8 @@ module Mgf
   module_function
   
   module MGFBase
+    module_function
+
     attr_reader :_comments
   
     @@_comments = Set.new('#;!/'.split(''))
@@ -47,7 +49,7 @@ module Mgf
       end
     end
   
-    def self.parse_precursor_charge(charge_text, list_only: false)
+    def parse_precursor_charge(charge_text, list_only: false)
       _parse_charge(charge_text, list_only: list_only)
     end
   
@@ -66,13 +68,15 @@ module Mgf
   
     def _read_header_lines(header_lines)
       header = {}
-      header_lines.each do |line|
-        break if line.strip == 'BEGIN IONS'
-        l = line.split('=')
-        if l.size == 2
-          key = l[0].downcase
-          val = l[1].strip
-          header[key] = val
+      File.open(header_lines) do |f|
+        f.each_line do |line|
+          break if line.strip == 'END IONS'
+          l = line.split('=')
+          if l.size == 2
+            key = l[0].downcase
+            val = l[1].strip
+            header[key] = val
+          end
         end
       end
       if header.include?('charge')
@@ -351,7 +355,7 @@ module Mgf
   
   Default_key_order = ['title', 'pepmass', 'rtinseconds', 'charge']
   
-  def _pepmass_repr(k, pepmass)
+  Pepmass_repr = lambda do |k, pepmass|
     outstr = k.upcase + '='
     if [String, Integer, Float].include?(pepmass).!
       begin
@@ -365,22 +369,22 @@ module Mgf
     outstr
   end
   
-  def _charge_repr(k, charge)
+  Charge_repr = lambda do |k, charge|
     "#{k.upcase}=#{_parse_charge(charge.to_s)}"
   end
   
-  def _default_repr(key, val)
+  Default_repr = lambda do |key, val|
     "#{key.upcase}=#{val}"
   end
   
-  Default_value_formatters = {'pepmass' => '_pepmass_repr', 'charge' => '_charge_repr'}
+  Default_value_formatters = {'pepmass' => Pepmass_repr, 'charge' => Charge_repr}
   
   # @aux._file_writer()
   def write(spectra, output: nil, header: '', key_order: Default_key_order, fragment_format: nil,
     write_charges: true, write_ions: false, use_numpy: nil, param_formatters: Default_value_formatters)
   
     def key_value_line(key, val)
-      (method(param_formatters[key]).call(key, val) || _default_repr(key, val)) + "\n"
+      (method(param_formatters[key]).call(key, val) || Default_repr.call(key, val)) + "\n"
     end
   
     @nones = [nil, Numpy.nan, Numpy.ma.masked]

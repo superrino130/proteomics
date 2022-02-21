@@ -6,7 +6,6 @@ require_relative 'auxiliary/file_helpers'
 require_relative 'auxiliary/target_decoy'
 require_relative '_schema_defaults'
 require 'set'
-require 'delegate'
 
 module Pepxml
   module_function
@@ -31,13 +30,13 @@ module Pepxml
       'floatarray' => Set.new(['all_ntt_prob'])
     }
     
-    def initialize(...)
-      __init__(...)
-    end
+    # def initialize(...)
+    #   __init__(...)
+    # end
     
-    def __init__(...)
-      @_index_class = HierarchicalOffsetIndex.new
-    end
+    # def __init__(...)
+    #   @_index_class = HierarchicalOffsetIndex.new
+    # end
   
       # # from class IndexSavingXML
       # def _read_byte_offsets
@@ -59,7 +58,7 @@ module Pepxml
       if kwargs.include?('ename')
         name = kwargs.delete('ename')
       else
-        name = _local_name(element)
+        name = Xml._local_name(element)
       end
       rec = kwargs.delete('recursive') || nil
       if name == @_root_element
@@ -77,6 +76,8 @@ module Pepxml
           Float::INFINITY
         elsif s.upcase == '-INF'
           -Float::INFINITY
+        elsif s.start_with('+-0')
+          0
         else
           s.to_f
         end
@@ -98,7 +99,7 @@ module Pepxml
       end
       ['search_score', 'parameter'].each do |k|
         if info.include?(k) && info[k].instance_of?(Array) && 
-          info[k].map{ |x| x.instance_of?(Hash) && x.size == 1 }.all?
+          info[k].all?{ |x| x.instance_of?(Hash) && x.size == 1 }
           scores = {}
           info[k].each do |score|
             name, value = score.to_a
@@ -108,7 +109,7 @@ module Pepxml
         end
       end
       if info.include?('search_result') && info['search_result'].size == 1
-        info.merge(info['search_result'][0])
+        info.merge!(info['search_result'][0])
         info.delete('search_result')
       end
       if info.include?('protein') && info.include?('peptide')
@@ -135,8 +136,8 @@ module Pepxml
             'mass' => info.delete('mod_nterm_mass').to_f})
         end
         if info.include?('mod_cterm_mass')
-          info['modifications'] << ({'position' => 1 + info['peptide'].size,
-            'mass' => info.delete('mod_cterm_mass').to_f})
+          info['modifications'] << {'position' => 1 + info['peptide'].size,
+            'mass' => info.delete('mod_cterm_mass').to_f}
         end
       end
       if info.include?('modified_peptide') && info['modified_peptide'] == info['peptide']
@@ -184,8 +185,8 @@ module Pepxml
       //*[local-name()='roc_error_data']"
     ).each do |roc_error_data|
       roc_error_data.xpath("*[local-name()='roc_data_point' or local-name()='error_point']").each do |element|
-        data_point = element.attrib.to_a
-        data_point.each do |key|
+        data_point = element.attrib.tally
+        data_point.each do |key, _|
           data_point[key] = data_point[key].to_f
         end
         data_point["charge"] = roc_error_data.attrib["charge"]
@@ -199,11 +200,11 @@ module Pepxml
   Chain = ChainBase._make_chain('Read', Read)
   
   @_is_decoy_prefix = lambda do |psm, prefix: 'DECOY_'|
-    psm['search_hit'][0]['proteins'].map{ |protein| protein['protein'].start_with(prefix) }.all?
+    psm['search_hit'][0]['proteins'].all?{ |protein| protein['protein'].start_with(prefix) }
   end
   
   @_is_decoy_suffix = lambda do |psm, suffix: '_DECOY'|
-    psm['search_hit'][0]['proteins'].map{ |protein| protein['protein'].end_with(suffix) }.all?
+    psm['search_hit'][0]['proteins'].all?{ |protein| protein['protein'].end_with(suffix) }
   end
   
   is_decoy = @_is_decoy_prefix
@@ -212,19 +213,116 @@ module Pepxml
   @qvalues = Target_decoy::Make_qvalues.call(Chain, @_is_decoy_prefix, @_is_decoy_suffix, _key)
   filter = lambda do |x = nil|
     if x.nil?
-      _make_filter(Chain, @_is_decoy_prefix, @_is_decoy_suffix, _key, @qvalues)
+      Target_decoy::Make_filter(Chain, @_is_decoy_prefix, @_is_decoy_suffix, _key, @qvalues)
     elsif x == 'chain' || x == :chain
-      y = _make_filter(Chain, @_is_decoy_prefix, @_is_decoy_suffix, _key, @qvalues)
-      _make_chain(y, 'filter', true)
+      y = Target_decoy::Make_filter(Chain, @_is_decoy_prefix, @_is_decoy_suffix, _key, @qvalues)
+      Target_decoy::Make_chain(y, 'filter', true)
     end
   end
   # Filter = _make_filter(Chain, _is_decoy_prefix, _is_decoy_suffix, _key, Qvalues)
   # Filter.chain = _make_chain(Filter, 'filter', true)
   
-  def DataFrame(*args, **kwargs)
+  def dataframe(*args, **kwargs)
     require 'pandas'
     kwargs = kwargs.dup
-    sep = kwargs.pop('sep', None)
-    pd_kwargs = kwargs.pop('pd_kwargs', {})  
+    sep = kwargs.delete('sep') || nil
+    pd_kwargs = kwargs.delete('pd_kwargs') || {}
+    def gen_item
+      f = Chain.new(*args, **kwargs)
+      f.each do |item|
+        info = {}
+        item.each do |k, v|
+          if [String, Integer, Float].include?(v.class)
+            info[k] = v
+          end
+        end
+        if item.include?('search_hit')
+          sh = item['search_hit'][0]
+          proteins = sh.delete('proteins')
+          prot_dict = {}
+          proteins.each do |p|
+            p.each do |k, _|
+              prot_dict[k] = []
+            end
+          end
+          proteins.each do |p|
+            prot_dict.each do |k, v|
+              v << p[k]
+            end
+          end
+          if seq.nil?
+            info.merge!(prot_dict)
+          else
+            prot_dict.each do |k, v|
+              info[k] = v.map{ |val| val.nil?.! ? val.to_s : '' }.join(sep)
+            end
+          end
+          info.merge!(sh.delete('search_score'))
+          mods = sh.delete('modifications') || []
+          formatted_mods = mods.map{ |x| "#{sprintf("%.03f", x[mass])}@#{x[position]}" }
+          if sep.nil?.!
+            info['modifications'] = formatted_mods.join(sep)
+          else
+            info['modifications'] = formatted_mods
+          end
+          sh.each do |k, v|
+            if [String, Integer, Float].include?(v.class)
+              info[k] = v
+            end
+          end
+          if sh.include?('analysis_result')
+            sh['analysis_result'].each do |ar|
+              if ar['analysis'] == 'peptideprophet'
+                if ar['peptideprophet_result'].include?('parameter')
+                  info.merge!(ar['peptideprophet_result']['parameter'])
+                end
+                info['peptideprophet_probability'] = ar['peptideprophet_result']['probability']
+                info['peptideprophet_ntt_prob'] = ar['peptideprophet_result']['all_ntt_prob']
+              elsif ar['analysis'] == 'interprophet'
+                info.merge!(ar['interprophet_result']['parameter'])
+                info['interprophet_probability'] = ar['interprophet_result']['probability']
+                info['interprophet_ntt_prob'] = ar['interprophet_result']['all_ntt_prob']
+              end
+            end
+          end
+        end
+        yield info
+      end
+    end
+    Pandas.DataFrame(gen_items, **pd_kwargs)
+  end
+
+  def filter_df(*args, **kwargs)
+    require 'pandas'
+    sep = kwargs['sep']
+    kwargs['key'] = 'expect' if kwargs.include?('key').!
+    if args.all?{ |arg| arg.instance_of?(Pandas.DataFrame) }
+      if args.size > 1
+        df = Pandas.concat(args)
+      else
+        df = args[0]
+      end
+    else
+      read_kw = {}
+      kwargs.each do |k, _|
+        if ['iterative', 'read_schema', 'sep', 'pd_kwargs'].include(k)
+          read_kw[k] = kwargs.delete(k)
+        end
+      end
+      df = dataframe(*args, **read_kw)
+    end
+    if kwargs.include?('is_decoy').!
+      if sep.nil?.!
+        if kwargs.include?('decoy_suffix')
+          kwargs['is_decoy'] = df['protein'].to_s.split(';').apply(
+            lambda { |s| s.all?{ |x| x.end_with(kwargs['decoy_suffix']) } })
+        else
+          kwargs['is_decoy'] = df['protein'].apply(
+            lambda { |s| s.all?{ |x| x.start_with(kwargs['decoy_preffix'] || 'DECOY_') } })
+        end
+      else
+      end
+    end
+    Target_decoy::filter.call(df, **kwargs)
   end
 end
