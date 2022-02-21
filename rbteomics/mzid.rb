@@ -14,6 +14,9 @@ module Mzid
   
   class MzIdentML
     # (xml.MultiProcessingXML, xml.IndexSavingXML)
+    include Xml::IndexSavingXML
+    include Xml::MultiProcessingXML
+
     @@file_format = 'mzIdentML'
     @@_root_element = 'MzIdentML'
     @@_default_schema = Mzid_schema_defaults
@@ -44,10 +47,6 @@ module Mzid
   
     def __init__(*args, **kwargs)
       kwargs['retrieve_refs'] = true if kwargs.include?('retrieve_refs').!
-  
-      @mpx = SimpleDelegator.new(Xml::MultiProcessingXML).new(*args, **kwargs)
-      @isx = SimpleDelegator.new(Xml::IndexSavingXML).new(*args, **kwargs)
-      @k = [@mpx, @isx]
     end
 
     def _get_info_smart(element, **kwargs)
@@ -69,18 +68,6 @@ module Mzid
             info.merge!(by_id)
             info.delete(k)
             info.delete('id')
-          end
-        end
-      end
-    end
-
-    def method_missing(method, ...)
-      @k.each do |x|
-        if x.respond_to?(method)
-          return x.method(method).call(...)
-        else
-          if x.method_missing(method, ...) != 'dummy'
-            return x.method_missing(method, ...)
           end
         end
       end

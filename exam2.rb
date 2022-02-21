@@ -41,16 +41,24 @@ def fragments(peptide, types: ['b', 'y'], maxcharge: 1)
   end
 end
 
+Mgf::Read.call('example.mgf') do |spectra|
+  # File.open('example.pep.xml') do |psms|
+    spectrum = _next(spectra)
+    p spectrum
+
+  # end
+end
+
+exit
+# with mgf.read('example.mgf') as spectra, pepxml.read('example.pep.xml') as psms:
+#     spectrum = next(spectra)
+#     psm = next(psms)
+
+
 
 
 exit
 
-if FileTest.exist?('yeast.fasta.gz').!
-  puts 'Downloading the FASTA file for Saccharomyces cerevisiae...'
-  URI.open("https://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/reference_proteomes/Eukaryota/UP000002311/UP000002311_559292.fasta.gz") {|f|
-    IO.copy_stream(f, 'yeast.fasta.gz')
-  }
-end
 
 puts 'Cleaving the proteins with trypsin...'
 unique_peptides = Set.new

@@ -99,7 +99,9 @@ class ChargeList < Array
   def __init__(*args, **kwargs)
     if ['', 0, nil, [], {}].include?(args).! || args[0].instance_of?(String)
       delim = /(?:,\s*)|(?:\s*and\s*)/
-      self[0].nil? ? self[0] = Charge.new(delim.match(arges[0])) : self[0] += Charge.new(delim.match(args[0]))
+      args[0].split(delim.match(args[0]).to_s).each do |e|
+        self << e
+      end
     else
       begin
         super(arges[0].uniq.sort, *args[1..-1], **kwargs)

@@ -21,8 +21,9 @@ module FASTABase
   end
 end
 
-class FASTA < FileReader
+class FASTA
   include FASTABase
+  include FileReader
 
   def initialize(...)
     __init__(...)

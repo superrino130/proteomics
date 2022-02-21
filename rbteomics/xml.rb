@@ -49,6 +49,7 @@ module Xml
   end
   
   module XMLValueConverter
+    module_function
     Duration_str_to_float = lambda do |s|
       if s.star_with?('P').!
         begin
@@ -104,19 +105,18 @@ module Xml
   
   SXMLParam ||= Struct.new(:name, :value, :type)
   
-  class XMLParam
-    def initialize(sxmlparam: nil)
+  module XMLParam
+    module_function
+    def __init__(sxmlparam: nil)
       @sxmlparam = sxmlparam
     end
   end
 
-  class XML < FileReader
+  module XML
+    include FileReader
+    module_function
     @@_element_handlers = {}
-  
-    def initialize(...)
-      __init__(...)
-    end
-  
+    
     def _get_info_smart(element, **kwargs)
       raise NotImplementedError
     end
@@ -546,10 +546,6 @@ module Xml
     def version_info
       # PASS
     end
-
-    def method_missing(method, ...)
-      'dummy'
-    end
   end
   
   Pattern_path = Regexp.compile('([\w/*]*)(.*)')
@@ -604,7 +600,7 @@ module Xml
       @indexed_tags = indexed_tags
       @indexed_tag_keys = keys
       @source = source
-      @offsets = HierarchicalOffsetIndex.new
+      @offsets = HierarchicalOffsetIndex.__init__
       build_index()
     end
   
@@ -665,14 +661,15 @@ module Xml
     OrderedDict(all_records)
   end
   
-  class IndexedXML
+  module IndexedXML
+    include XML
+    include IndexedReaderMixin
+
+    module_function
+
     @@_indexed_tags = Set.new
     @@_indexed_tag_keys = {}
     @@_use_index = true
-
-    def initialize(...)
-      __init__(...)
-    end
   
     def __init__(source, *args, **kwargs)
       # kwargs = kwargs.dup
@@ -694,9 +691,6 @@ module Xml
           warn('_default_iter_path differs from _default_iter_tag and index is enabled. _default_iter_tag will be used in the index, mind the consequences.')
         end
       end
-      @c1 = SimpleDelegator.new(IndexedReaderMixin).new(source, *args, **kwargs)
-      @c2 = SimpleDelegator.new(XML).new(source, *args, **kwargs)
-      @k =  [@c1, @c2]      
   
       @_offset_index = nil
       _build_index()
@@ -790,72 +784,27 @@ module Xml
       end
       Iterfind.new(path, **kwargs)
     end
-
-    def method_missing(method, ...)
-      @k.each do |x|
-        if x.respond_to?(method)
-          return x.method(method).call(...)
-        else
-          if x.method_missing(method, ...) != 'dummy'
-            return x.method_missing(method, ...)
-          end
-        end
-      end
-    end
   end
   
-  class MultiProcessingXML
-    def initialize(...)
-      __init__(...)
-    end
-
-    def __init__(...)
-      @c1 = SimpleDelegator.new(IndexedXML).new(...)
-      @c2 = SimpleDelegator.new(TaskMappingMixin).new(...)
-      @k = [@c1, @c2]
-    end
+  module MultiProcessingXML
+    include TaskMappingMixin
+    include IndexedXML
+    module_function
   
     def _task_map_iterator
       @_offset_index[self._default_iter_tag].to_enum
-    end
-  
-    def method_missing(method, ...)
-      @k.each do |x|
-        if x.respond_to?(method)
-          return x.method(method).call(...)
-        else
-          if x.method_missing(method, ...) != 'dummy'
-            return x.method_missing(method, ...)
-          end
-        end
-      end
-    end
+    end  
   end
   
-  class IndexSavingXML
-    def initialize(...)
-      __init__(...)
-    end
+  module IndexSavingXML
+    include IndexedXML
+    include IndexSavingMixin
+    module_function
     
     def __init__(...)
-      @_index_class = HierarchicalOffsetIndex.new
-      @c1 = SimpleDelegator.new(IndexSavingMixin).new(...)
-      @c2 = SimpleDelegator.new(IndexedXML).new(...)
-      @k =  [@c1, @c2]
+      @_index_class = HierarchicalOffsetIndex.__init__
     end
-  
-    def method_missing(method, ...)
-      @k.each do |x|
-        if x.respond_to?(method)
-          return x.method(method).call(...)
-        else
-          if x.method_missing(method, ...) != 'dummy'
-            return x.method_missing(method, ...)
-          end
-        end
-      end
-    end
-  
+    
     def _read_byte_offsets
       File.open(@_byte_offset_filename, 'r') do |f|
         index = @_index_class.load(f)
@@ -912,11 +861,9 @@ module Xml
     end
   end
   
-  class Iterfind
-    def initialize(...)
-      @md = Struct.new(:start, :stop, :step)
-      __init__(...)
-    end
+  module Iterfind
+    @@md = Struct.new(:start, :stop, :step)
+    module_function
   
     def __init__(parser, tag_name, **kwargs)
       @parser = parser
@@ -994,16 +941,9 @@ module Xml
   end
   
   class IndexedIterfind
-    def initialize(...)
-      __init__(...)
-    end
-  
-    def __init__(...)
-      @c1 = TaskMappingMixin.new(...)
-      @c2 = Iterfind.new(...)
-      @k = [@c1, @c2]
-    end
-  
+    include Iterfind
+    include TaskMappingMixin
+
     def _task_map_iterator
       _index.to_enum
     end
@@ -1055,18 +995,6 @@ module Xml
   
     def __len__
       @index.size
-    end
-  
-    def method_missing(method, ...)
-      @k.each do |x|
-        if x.respond_to?(method)
-          return x.method(method).call(...)
-        else
-          if x.method_missing(method, ...) != 'dummy'
-            return x.method_missing(method, ...)
-          end
-        end
-      end
-    end
+    end  
   end
 end

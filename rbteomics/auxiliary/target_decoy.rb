@@ -195,7 +195,7 @@ module Target_decoy
       #@_keepstate
       def get_scores(*args, **kwargs)
         scores = []
-        @read.call(*args, **kwargs) do |f|
+        f = @read.new(*args, **kwargs)
           f.each_with_index do |psm, i|
             row = []
             [keyf, isdecoy].each do |func|
@@ -211,7 +211,6 @@ module Target_decoy
             row << psm if full
             scores << [row]
           end
-        end
         scores
       end
   
@@ -463,13 +462,10 @@ module Target_decoy
     end
   
     _filter = lambda do |*args, **kwargs|
-      if kwargs.include?('full_output')
-        if [0, '', nil, []].include?(kwargs['full_output']).!
-          kwargs.delete('full_output')
-          return @filter.call(*args, 'full_output' => true, **kwargs)
-        end
+      if kwargs.include?('full_output').! || [0, '', nil, []].include?(kwargs.delete('full_output')).!
+        return filter.call(*args, 'full_output' => true, **kwargs)
       end
-      return IteratorContextManager.new(*args, 'parser_func' => filter, **kwargs)
+      return IteratorContextManager.__init__(*args, 'parser_func' => filter, **kwargs)
     end
   
     _fix_docstring(_filter, 'is_decoy' => is_decoy_prefix, 'key' => key)
@@ -499,7 +495,7 @@ module Target_decoy
   end
   
   #@contextmanager
-  def _itercontext(x, **kw)
+  Itercontext = lambda do |x, **kw|
     begin
       yield x.iterrows().map{ |_, row| row }
     rescue => exception
@@ -507,7 +503,8 @@ module Target_decoy
     end
   end
   
-  @_iter = ChainBase._make_chain('_itercontext')
+  # @_iter = ChainBase._make_chain('_itercontext')
+  @_iter = ChainBase._make_chain(:Itercontext, Itercontext)
   # def qvalues(read = @_iter, key: nil, is_decoy: nil, remove_decoy: nil)
   #   @qvalues = _make_qvalues(read, key, is_decoy, remove_decoy)
   # end

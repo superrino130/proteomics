@@ -1,4 +1,5 @@
 require 'minitest/autorun'
+require_relative 'data'
 
 # import os
 # import numpy as np
@@ -24,9 +25,29 @@ class MGFTest < Minitest::Test
   def setup
     @maxDiff = nil
     @_encoding = 'utf-8'
-    @path = 'test.mgf'
-    @header = read_header(@path)
-    f = read(@path)
-    @spectra = f.to_a
+    @path = 'tests/test.mgf'
+    @header = Mgf.read_header(@path)
+    f = Mgf::Read.call(@path)
+    # @spectra = f.to_a
+  end
+
+  def test_read
+    # for func in [mgf.read, mgf.MGF, mgf.IndexedMGF]:
+    #   # http://stackoverflow.com/q/14246983/1258041
+    #   self.assertEqual(data.mgf_spectra_long, list(func(self.path)))
+    #   self.assertEqual(data.mgf_spectra_short, list(func(self.path, False)))
+    #   with func(self.path) as reader:
+    #       self.assertEqual(data.mgf_spectra_long, list(reader))
+    #   with func(self.path, False) as reader:
+    #       self.assertEqual(data.mgf_spectra_short, list(reader))
+
+    assert_equal Mgf_spectra_long, Mgf::Read.call(@path)
+      # self.assertEqual(data.mgf_spectra_short, list(func(self.path, False)))
+      # with func(self.path) as reader:
+      #     self.assertEqual(data.mgf_spectra_long, list(reader))
+      # with func(self.path, False) as reader:
+      #     self.assertEqual(data.mgf_spectra_short, list(reader))
+
+
   end
 end

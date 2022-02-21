@@ -12,6 +12,9 @@ module Pepxml
   module_function
   class PepXML
   #class PepXML(xml.MultiProcessingXML, xml.IndexSavingXML):
+    include Xml::IndexSavingXML
+    include Xml::MultiProcessingXML
+  
     @@file_format = 'pepXML'
     @@_root_element = 'msms_pipeline_analysis'
     @@_default_schema = Pepxml_schema_defaults
@@ -34,9 +37,6 @@ module Pepxml
     
     def __init__(...)
       @_index_class = HierarchicalOffsetIndex.new
-    
-      @mpx = SimpleDelegator.new(Xml::MultiProcessingXML).new(...)
-      @isx = SimpleDelegator.new(Xml::IndexSavingXML).new(...)
     end
   
       # # from class IndexSavingXML
@@ -157,19 +157,10 @@ module Pepxml
         info['search_hit'] = info['search_hit'].sort_by{ |x| x['hit_rank'] }
       end
       info
-    end
-    
-    def method_missing(method, ...)
-      [@mpx, @isx].each do |obj|
-        if obj.respond_to?(method)
-          return obj.method(method).call(...)
-        end
-      end
-      raise "NoMethod in #{self.class} called #{method}"
-    end
+    end    
   end
     
-  def read(source, **kwargs)
+  Read = lambda do |source, **kwargs|
     read_schema = kwargs['read_schema'] || false
     iterative = kwargs['iterative'] ||  true
     PepXML.new(source, 'read_schema' => read_schema, 'iterative' => iterative)
@@ -205,7 +196,7 @@ module Pepxml
     roc_curve
   end
   
-  Chain = ChainBase._make_chain('read')
+  Chain = ChainBase._make_chain('Read', Read)
   
   @_is_decoy_prefix = lambda do |psm, prefix: 'DECOY_'|
     psm['search_hit'][0]['proteins'].map{ |protein| protein['protein'].start_with(prefix) }.all?
@@ -234,7 +225,6 @@ module Pepxml
     require 'pandas'
     kwargs = kwargs.dup
     sep = kwargs.pop('sep', None)
-    pd_kwargs = kwargs.pop('pd_kwargs', {})
-  
+    pd_kwargs = kwargs.pop('pd_kwargs', {})  
   end
 end

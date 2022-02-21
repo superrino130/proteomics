@@ -8,7 +8,8 @@ require_relative '../rbteomics/auxiliary/target_decoy'
 
 module Tandem
   module_function
-  class TandemXML < Xml::XML
+  class TandemXML
+    include Xml::XML
     @@file_format = "TandemXML"
     @@_root_element = "bioml"
     @@_default_schema = Tandem_schema_defaults

@@ -128,29 +128,28 @@ class File_obj
   def __iter__()
     iter(@file)
   end
+
+  def lines
+    @file
+  end
 end
 
-class NoOpBaseReader
-  def initialize(...)
-    __init__(...)
-  end
-
+module NoOpBaseReader
+  module_function
   def __init__(...)
     # PASS
   end
 end
 
-class IteratorContextManager < NoOpBaseReader
-  def initialize(...)
-    __init__(...)
-  end
-
+module IteratorContextManager
+  include NoOpBaseReader
+  module_function
   def __init__(*args, **kwargs)
     @_func = kwargs.delete('parser_func')
     @_args = args
     @_kwargs = kwargs
     reset() if self.class == IteratorContextManager
-    super
+    # super
   end
 
   def __getstate__()
@@ -190,15 +189,14 @@ class IteratorContextManager < NoOpBaseReader
     _next(@_reader)
   end
 
+
 #   _next = __next__()
 end
 
 # @add_metaclass(ABCMeta)
-class FileReader < IteratorContextManager
-  def initialize(...)
-    __init__(...)
-  end
-
+module FileReader
+  module_function
+  include IteratorContextManager
   def __init__(source, **kwargs)
     func = kwargs['parser_func']
     super(*kwargs['args'], 'parser_func' => func, **kwargs['kwargs'])
@@ -236,17 +234,17 @@ class FileReader < IteratorContextManager
     end
     return @_source.respond_to?(:attr)
   end
-
-  def method_missing(method, ...)
-    'dummy'
-  end
 end
 
 def remove_bom(bstr)
   bstr.gsub(/\xFE\xFF|\xFF\xFE/n,"").gsub(/\xFE\xFF|\xFF\xFE/n,"").gsub!(/\x00$/, '')
 end
 
-class IndexedReaderMixin < NoOpBaseReader
+module IndexedReaderMixin
+  include NoOpBaseReader
+
+  module_function
+  
   attr_reader :_offset_index
   
   def index
@@ -328,10 +326,6 @@ class IndexedReaderMixin < NoOpBaseReader
     end
     raise PyteomicsError.new("Unsupported query key: #{key}")
   end
-
-  def method_missing(method, ...)
-    'dummy'
-  end
 end
 
 class RTLocator
@@ -404,15 +398,14 @@ class RTLocator
   end
 end
 
-class TimeOrderedIndexedReaderMixin < IndexedReaderMixin
+module TimeOrderedIndexedReaderMixin
+  include IndexedReaderMixin
+
+  module_function
 
   #@property
   def time
       @_time
-  end
-
-  def initialize(...)
-    __init__(...)
   end
 
   def __init__(*args, **kwargs)
@@ -426,22 +419,19 @@ class TimeOrderedIndexedReaderMixin < IndexedReaderMixin
   end
 end
 
-class IndexedTextReader
+module IndexedTextReader
+  include IndexedReaderMixin
+  include FileReader
   @@delimiter = nil
   @@label = nil
   @@block_size = 1000000
   @@label_group = 1
 
-  def initialize(...)
-    __init__(...)
-  end
+  module_function
 
   def __init__(source, **kwargs)
     encoding = kwargs.delete('encoding') || 'utf-8'
 
-    @c1 = SimpleDelegator.new(FileReader).new(source, 'mode' => 'rb', 'encoding' => nil, **kwargs)
-    @c2 = SimpleDelegator.new(IndexedReaderMixin).new(source, 'mode' => 'rb', 'encoding' => nil, **kwargs)
-    @k =  [@c1, @c2]
     @encoding = encoding
     ['delimiter', 'label', 'block_size', 'label_group'].each do |attr|
       if kwargs.include?(attr)
@@ -507,21 +497,13 @@ class IndexedTextReader
     lines = @_source.read(_end - start).decode(@encoding).split('\n')
     lines
   end
-
-  def method_missing(method, ...)
-    @k.each do |x|
-      if x.respond_to?(method)
-        return x.method(method).call(...)
-      else
-        if x.method_missing(method, ...) != 'dummy'
-          return x.method_missing(method, ...)
-        end
-      end
-    end
-  end
 end
 
-class IndexSavingMixin < NoOpBaseReader
+module IndexSavingMixin
+  include NoOpBaseReader
+
+  module_function
+
   @@_index_class = NotImplementedError
 
   #property
@@ -554,7 +536,7 @@ class IndexSavingMixin < NoOpBaseReader
     end
   end
 
-  @_keepstate_method
+  #@_keepstate_method
   def _build_index
     return if @_use_index.!
     begin
@@ -599,6 +581,8 @@ module WritableIndex
   Schema_version = [1, 0, 0]
   Schema_version_tag_key = "@pyteomics_schema_version"
 
+  module_function
+
   def _serializable_container
     {'index' => self.constants}
   end
@@ -634,7 +618,7 @@ class OffsetIndex
   def initialize(...)
     __init__(...)
   end
-
+  
   def __init__(*args, **kwargs)
     @hash = {}
     if args.empty?.!
@@ -756,40 +740,17 @@ class OffsetIndex
   end
 end
 
-class IndexSavingTextReader
+module IndexSavingTextReader
+  include IndexedTextReader
+  include IndexSavingMixin
   @@_index_class = OffsetIndex
-
-  def initialize(...)
-    __init__(...)
-  end
-
-  def __init__(...)
-    @c1 = SimpleDelegator.new(IndexSavingMixin).new(...)
-    @c2 = SimpleDelegator.new(IndexedTextReader).new(...)
-    @k =  [@c1, @c2]
-  end
-
-  def method_missing(method, ...)
-    @k.each do |x|
-      if x.respond_to?(method)
-        return x.method(method).call(...)
-      else
-        if x.method_missing(method, ...) != 'dummy'
-          return x.method_missing(method, ...)
-        end
-      end
-    end
-  end
 end
 
-class HierarchicalOffsetIndex
+module HierarchicalOffsetIndex
   include WritableIndex
-
-  def initialize(...)
-    @_inner_type = OffsetIndex
-    __init__(...)
-  end
-
+  module_function
+  @@_inner_type = OffsetIndex
+  
   def __init__(base: nil)
     @mapping = Hash.new #(self._inner_type)
     (base || {}).each do |key, value|
@@ -1032,11 +993,9 @@ end
 QUEUE_TIMEOUT = 4
 QUEUE_SIZE = 1e7.to_i
 
-class TaskMappingMixin < NoOpBaseReader
-  def initialize(...)
-    __init__(...)
-  end
-
+module TaskMappingMixin
+  include NoOpBaseReader
+  module_function
   def __init__(*args, **kwargs)
     @_queue_size = kwargs.delete('queue_size') || QUEUE_SIZE
     @_queue_timeout = kwargs.delete('timeout') || QUEUE_TIMEOUT
@@ -1091,7 +1050,12 @@ class TaskMappingMixin < NoOpBaseReader
     feeder_thread
   end
 
-  def map(target:nil , processes: -1, args: nil, kwargs: nil, **_kwargs)
+  def map(**_kwargs)
+    target = _kwargs['target'] || nil
+    processes = _kwargs['processes'] || -1
+    args = _kwargs['args'] || nil
+    kwargs = _kwargs['kwargs'] || nil
+
     if @_offset_index.nil?
       raise PyteomicsError.new('The reader needs an index for map() calls. Create the reader with `use_index=True`.')
     end
@@ -1154,7 +1118,7 @@ class TaskMappingMixin < NoOpBaseReader
   end
 
   def _task_map_iterator
-    @_offset_index.keys.tu_enum
+    @_offset_index.keys.to_enum
   end
 end
 
@@ -1173,22 +1137,19 @@ class ChainBase
     cls.new(*sources, **kwargs)
   end
 
-  def self._make_chain(sequence_maker)
+  def self._make_chain(sequence_maker, *args)
     if sequence_maker.instance_of?(Class)
-      tp = sequence_maker.class.to_s.concat('Chain')
       tp = Class.new(self) {
         def sequence_maker
-          raise NotImplementedError.new
+          sequence_maker
         end
         define_method(sequence_maker.to_s, instance_method(:sequence_maker))
       }
     else
-      functionChain = Class.new(self)
-      functionChain.define_singleton_method(sequence_maker) do
-        raise NotImplementedError.new
-      end
-      return functionChain
+      tp = Class.new(self)
+      tp.define_singleton_method(sequence_maker.to_s, args[0])
     end
+    return tp
   end
 
   def sequence_maker(file)
@@ -1233,7 +1194,12 @@ class ChainBase
     __next__()
   end
 
-  def map(target: nil, processes: -1, queue_timeout: _QUEUE_TIMEOUT, args: nil, kwargs: nil, **_kwargs)
+  def map(**_kwargs)
+    target = _kwargs['target'] || nil
+    processes = _kwargs['processes'] || -1
+    queue_timeout = _kwargs['queue_timeout'] || _QUEUE_TIMEOUT
+    args = _kwargs['args'] || nil
+    kwargs = _kwargs['kwargs'] || nil
     @sources.each do |f|
       _create_sequence(f) do |r|
         r.map(target, processes, queue_timeout, args, kwargs, **_kwargs).each do |result|
