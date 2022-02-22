@@ -47,7 +47,7 @@ class TestUseIndex < Minitest::Test
 
   def _check_file_object(fo, value)
     Warning.reset_count
-    result = _check_use_index(fo, nil, nil)
+    result = File_helpers._check_use_index(fo, nil, nil)
     assert_equal Warning.count.size, 0
     assert_equal result, value
   end
@@ -55,7 +55,7 @@ class TestUseIndex < Minitest::Test
   def test_str_name
     [false, true].each do |ui|
       [false, true].each do |default|
-        assert_equal _check_use_index('test.mgf', ui, default), ui
+        assert_equal File_helpers._check_use_index('test.mgf', ui, default), ui
       end
     end
   end
@@ -85,7 +85,7 @@ class TestUseIndex < Minitest::Test
   def test_stringio
     Warning.reset_count
     StringIO.open('test') do |f|
-      _check_use_index(f, nil, nil)
+      File_helpers._check_use_index(f, nil, nil)
       assert_equal Warning.count.size, 1
       assert_nil Warning.count[0][0]
     end

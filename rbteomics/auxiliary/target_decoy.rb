@@ -193,7 +193,7 @@ module Target_decoy
     @mq_key = key
     @mqvalues = lambda do |*args, **kwargs|
       #@_keepstate
-      def get_scores(*args, **kwargs)
+      def in_get_scores(*args, **kwargs)
         scores = []
         f = @read.new(*args, **kwargs)
           f.each_with_index do |psm, i|
@@ -212,6 +212,10 @@ module Target_decoy
             scores << [row]
           end
         scores
+      end
+      def get_scores(*args, **kwargs)
+        _keepstate(:in_get_scores)
+        in_get_scores(*args, **kwargs)
       end
   
       peps = kwargs['pep'] || nil
@@ -504,7 +508,7 @@ module Target_decoy
   end
   
   # @_iter = ChainBase._make_chain('_itercontext')
-  @_iter = ChainBase._make_chain(:Itercontext, Itercontext)
+  @_iter = File_helpers::ChainBase._make_chain(:Itercontext, Itercontext)
   # def qvalues(read = @_iter, key: nil, is_decoy: nil, remove_decoy: nil)
   #   @qvalues = _make_qvalues(read, key, is_decoy, remove_decoy)
   # end

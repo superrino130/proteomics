@@ -41,6 +41,11 @@ def fragments(peptide, types: ['b', 'y'], maxcharge: 1)
   end
 end
 
+spectrum = Mgf::Read.call('example.mgf')
+psms = Pepxml::Read.call('example.pep.xml')
+
+
+
 Mgf::Read.call('example.mgf') do |spectra|
   # File.open('example.pep.xml') do |psms|
     spectrum = _next(spectra)

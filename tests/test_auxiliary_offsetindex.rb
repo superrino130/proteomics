@@ -4,7 +4,7 @@ require_relative '../rbteomics/auxiliary/file_helpers'
 class TestOffsetIndex < Minitest::Test
   def setup
     @sequence = (0...10).map{ [_1.to_s, _1] }
-    @index = OffsetIndex.new(@sequence)
+    @index = File_helpers::OffsetIndex.new(@sequence)
   end
 
   def test_index_sequence

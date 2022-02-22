@@ -25,7 +25,6 @@ BaseString ||= String
 #     from urllib.request import urlopen, URLError
 require 'set'
 require 'open-uri'
-require 'delegate'
 require 'rexml/document'
 
 module Xml
@@ -50,16 +49,17 @@ module Xml
   
   module XMLValueConverter
     module_function
+    @@_duration_parser = Regexp.compile('(?P<sign>-?)P(?:(?P<years>\d+\.?\d*)Y)?(?:(?P<months>\d+\.?\d*)M)?(?:(?P<days>\d+\.?\d*)D)?(?:T(?:(?P<hours>\d+\.?\d*)H)?(?:(?P<minutes>\d+\.?\d*)M)?(?:(?P<seconds>\d+\.?\d*)S)?)?')
+    
     Duration_str_to_float = lambda do |s|
-      if s.star_with?('P').!
+      if s.start_with?('P').!
         begin
           return UnitFloat.new(s, 'duration')
         rescue => exception
           return Unitstr.new(s, 'duration')
         end
       end
-      _duration_parser = Regexp.compile('(?P<sign>-?)P(?:(?P<years>\d+\.?\d*)Y)?(?:(?P<months>\d+\.?\d*)M)?(?:(?P<days>\d+\.?\d*)D)?(?:T(?:(?P<hours>\d+\.?\d*)H)?(?:(?P<minutes>\d+\.?\d*)M)?(?:(?P<seconds>\d+\.?\d*)S)?)?')
-      match = self._duration_parser.search(s)
+      match = @@_duration_parser.search(s)
       if match.nil?.!
         matchdict = match.groupdict()
         hours = matchdict['hours'].to_f || 0
@@ -79,7 +79,7 @@ module Xml
       raise PyteomicsError.new('Cannot convert string to bool: ' + s)
     end
   
-    str_to_num = lambda do |s, numtype|
+    Str_to_num = lambda do |s, numtype|
       ['', nil].include?(s).! ? numtype(s) : nil
     end
   
@@ -113,8 +113,26 @@ module Xml
   end
 
   module XML
-    include FileReader
+    extend File_helpers
+    extend File_helpers::FileReader
     module_function
+
+    @@file_format = 'XML'
+    @@_root_element = nil
+    @@_default_schema = {}
+    @@_read_schema = false
+    @@_default_version = 0
+    @@_default_iter_tag = nil
+    @@_default_iter_path = nil
+    @@_structures_to_flatten = []
+    @@_schema_location_param = 'schemaLocation'
+    @@_default_id_attr = 'id'
+    @@_huge_tree = false
+    @@_retrieve_refs_enabled = nil  # only some subclasses implement this
+    @@_iterative = true
+
+    # Configurable plugin logic
+    @@_converters = XMLValueConverter.converters()
     @@_element_handlers = {}
     
     def _get_info_smart(element, **kwargs)
@@ -122,21 +140,6 @@ module Xml
     end
   
     def __init__(source, **kwargs)
-      @file_format = 'XML'
-      @_root_element = nil
-      @_default_schema = {}
-      @_read_schema = false
-      @_default_version = 0
-      @_default_iter_tag = nil
-      @_default_iter_path = nil
-      @_structures_to_flatten = []
-      @_schema_location_param = 'schemaLocation'
-      @_default_id_attr = 'id'
-      @_huge_tree = false
-      @_retrieve_refs_enabled = nil
-      @_iterative = true
-      @_converters = XMLValueConverter.converters()
-  
       read_schema = kwargs['read_schema'] || nil
       iterative = kwargs['iterative'] || nil
       build_id_cache = kwargs['build_id_cache'] || false
@@ -196,7 +199,7 @@ module Xml
     end
   
     #@_keepstate
-    def _get_schema_info(read_schema: true)
+    def in_get_schema_info(read_schema: true)
       return @_default_schema if read_schema.!
   
       version, schema = @version_info
@@ -233,6 +236,10 @@ module Xml
         ret = @_default_schema
       end
       ret
+    end
+    def _get_schema_info(read_schema: true)
+      _keepstate(:in_get_schema_info)
+      in_get_schema_info(read_schema: read_schema)
     end
   
     def _handle_param(element, **kwargs)
@@ -394,9 +401,13 @@ module Xml
     end
   
     #@_keepstate
-    def build_tree
+    def in_build_tree
       ps = etree.XMLParser(remove_comments: true, huge_tree: true)
       @_tree = etree.parse(@_source, 'parser' => ps)
+    end
+    def build_tree
+      _keepstate(:in_build_tree)
+      in_build_tree
     end
   
     def clear_tree
@@ -412,7 +423,7 @@ module Xml
     end
   
     #@_keepstate
-    def _iterfind_impl(path, **kwargs)
+    def in_iterfind_impl(path, **kwargs)
       begin
         m = pattern_path.match(path)
         path = m[1]
@@ -486,9 +497,13 @@ module Xml
         end
       end
     end
+    def _iterfind_impl(path, **kwargs)
+      _keepstate(:in_iterfind_impl)
+      in_iterfind_impl
+    end
   
     #@_keepstate
-    def build_id_cache
+    def in_build_id_cache
       stack = 0
       id_dict = {}
       etree.iterparse(@_source, 'events' => ['start', 'end'],
@@ -507,6 +522,10 @@ module Xml
         end
       end
       @_id_dict = id_dict
+    end
+    def build_id_cache
+      _keepstate(:in_build_id_cache)
+      in_build_id_cache
     end
   
     def clear_id_cache
@@ -530,13 +549,17 @@ module Xml
     end
   
     #@_keepstate
-    def get_by_id(elem_id, **kwargs)
+    def in_get_by_id(elem_id, **kwargs)
       if @_id_dict.!
         elem = _find_by_id_no_reset(elem_id)
       else
         elem = @_id_dict[elem_id]
       end
       _get_info_smart(elem, **kwargs)
+    end
+    def get_by_id(elem_id, **kwargs)
+      _keepstate(:in_get_by_id)
+      in_get_by_id(elem_id, **kwargs)
     end
 
     def self._element_handlers
@@ -582,8 +605,78 @@ module Xml
     version_info.call('Not started')
   end
   
-  class ByteCountingXMLScanner < File_obj
-    # Not started
+  class ByteCountingXMLScanner < File_helpers::File_obj
+    @@entities = {
+      'quot' => '"',
+      'amp' => '&',
+      'apos' => "'",
+      'lt' => '<',
+      'gt' => '>'
+    }
+    @@xml_entity_pattern = Regexp.compile("&(#{entities.keys.join('|')});")
+
+    def initialize(...)
+      __init__(...)
+    end
+
+    def __init__(source, indexed_tags, block_size: 1000000)
+      super(source, 'rb')
+      @indexed_tags = ensure_bytes(indexed_tags)
+      @block_size = block_size
+    end
+
+    def _chunk_iterator
+      # n s
+    end
+
+    def _generate_offsets
+      # n s
+    end
+
+    _entity_sub_cb = lambda do |match|
+      # n s
+    end
+
+    def replace_entities(key)
+      return @@xml_entity_pattern.sub(_entity_sub_cb, key)
+    end
+
+    def in_build_byte_index(lookup_id_key_mapping: nil)
+      if lookup_id_key_mapping.nil?
+        lookup_id_key_mapping = {}
+        lookup_id_key_mapping = lookup_id_key_mapping.map{ |key, value| [ensure_bytes_single(key), ensure_bytes_single(value)] }
+      end
+
+      @indexed_tags.each do |name|
+        bname = ensure_bytes_single(name)
+        lookup_id_key_mapping[bname] = 'id' if lookup_id_key_mapping.include?(bname).!
+        lookup_id_key_mapping[bname] = ensure_bytes_single(lookup_id_key_mapping[bname])
+      end
+
+      indices = HierarchicalOffsetIndex.new
+      g = _generate_offsets()
+      g.each do |offset, offset_type, attrs|
+        k = attrs[lookup_id_key_mapping[offset_type]].decode('utf-8')
+        if k.include?('&')
+          k = replace_entities(k)
+        end
+        indices[offset_type.decode('utf-8')][k] = offset
+      end
+      return indices
+    end
+    def build_byte_index(lookup_id_key_mapping: nil)
+      _keepstate(:in_build_byte_index)
+      in_build_byte_index(lookup_id_key_mapping: lookup_id_key_mapping)
+    end
+
+    def in_scan(cls, source, indexed_tags)
+      inst = cls.new(source, indexed_tags)
+      return inst.build_byte_index()
+    end
+    def scan(cls, source, indexed_tags)
+      _keepstate(:in_scan)
+      in_scan(cls, source, indexed_tags)
+    end
   end
   
   class TagSpecificXMLByteIndex
@@ -662,8 +755,10 @@ module Xml
   end
   
   module IndexedXML
+    extend File_helpers
+    extend File_helpers::IndexSavingMixin
     include XML
-    include IndexedReaderMixin
+    include File_helpers::IndexedReaderMixin
 
     module_function
 
@@ -672,7 +767,6 @@ module Xml
     @@_use_index = true
   
     def __init__(source, *args, **kwargs)
-      # kwargs = kwargs.dup
       kwargs['read_schema'] ||= false
       kwargs['iterative'] ||= true
       kwargs['build_id_cache'] ||= false
@@ -693,7 +787,7 @@ module Xml
       end
   
       @_offset_index = nil
-      _build_index()
+      self._build_index()
     end
   
     # @property
@@ -735,21 +829,29 @@ module Xml
     end
   
     # @_keepstate
-    def _build_index
+    def in_build_index
       if ['', 0, nil, false, [], {}].include?(@_indexed_tags) || ['', 0, nil, false, [], {}].include?(@_use_index)
         return
       end
       @_offset_index = TagSpecificXMLByteIndex.build(
         @_source, indexed_tags: @_indexed_tags, keys: @_indexed_tag_keys)
     end
-  
-    #@_keepstate
-    def _find_by_id_reset(elem_id, id_key: nil)
-      _find_by_id_no_reset(elem_id, id_key: id_key)
+    def self._build_index
+      _keepstate(:in_build_index)
+      in_build_index
     end
   
     #@_keepstate
-    def get_by_id(elem_id, **kwargs)
+    def in_find_by_id_reset(elem_id, id_key: nil)
+      _find_by_id_no_reset(elem_id, id_key: id_key)
+    end
+    def _find_by_id_reset(elem_id, id_key: nil)
+      _keepstate(:in_find_by_id_reset)
+      in_find_by_id_reset(elem_idk id_key: id_key)
+    end
+  
+    #@_keepstate
+    def in_get_by_id(elem_id, **kwargs)
       id_key = kwargs['id_key'] || nil
       element_type = kwargs['element_type'] || nil
       begin
@@ -769,6 +871,10 @@ module Xml
       end
       data = _get_info_smart(elem, **kwargs)
     end
+    def get_by_id(elem_id, **kwargs)
+      _keepstate(:in_get_by_id)
+      in_get_by_id(elem_id, **kwargs)
+    end
   
     def __contains__(key)
       @_offset_index[@_default_iter_tag].include?(key)
@@ -787,7 +893,7 @@ module Xml
   end
   
   module MultiProcessingXML
-    include TaskMappingMixin
+    include File_helpers::TaskMappingMixin
     include IndexedXML
     module_function
   
@@ -798,12 +904,10 @@ module Xml
   
   module IndexSavingXML
     include IndexedXML
-    include IndexSavingMixin
+    include File_helpers::IndexSavingMixin
     module_function
     
-    def __init__(...)
-      @_index_class = HierarchicalOffsetIndex.__init__
-    end
+    @@_index_class = File_helpers::HierarchicalOffsetIndex.__init__
     
     def _read_byte_offsets
       File.open(@_byte_offset_filename, 'r') do |f|
@@ -942,7 +1046,7 @@ module Xml
   
   class IndexedIterfind
     include Iterfind
-    include TaskMappingMixin
+    include File_helpers::TaskMappingMixin
 
     def _task_map_iterator
       _index.to_enum

@@ -12,6 +12,8 @@ require_relative 'auxiliary/file_helpers'
 require 'set'
 
 module Mgf
+  extend File_helpers
+  
   module_function
   
   module MGFBase
@@ -169,9 +171,9 @@ module Mgf
   end
   
   class IndexedMGF
-    include TaskMappingMixin
-    include TimeOrderedIndexedReaderMixin
-    include IndexSavingTextReader
+    include File_helpers::TaskMappingMixin
+    include File_helpers::TimeOrderedIndexedReaderMixin
+    include File_helpers::IndexSavingTextReader
     include MGFBase
     
     @@delimiter = 'BEGIN IONS'
@@ -232,7 +234,7 @@ module Mgf
     end
   
     # @aux._keepstate_method
-    def _read_header
+    def in_read_header
       begin
         first = @_offset_index.values.map{ _1 }[0].next
       rescue => exception
@@ -240,6 +242,10 @@ module Mgf
       end
       header_lines = read(first).encode(@encoding).split("\n")
       _read_header_lines(header_lines)
+    end
+    def _read_header
+      _keepstate_method(:in_read_header)
+      in_read_header
     end
   
     def _item_from_offsets(offsets)
@@ -261,7 +267,8 @@ module Mgf
   end
   
   class MGF
-    include FileReader
+    include File_helpers
+    include File_helpers::FileReader
     include MGFBase
   
     def initialize(...)
@@ -285,8 +292,12 @@ module Mgf
     end
   
     # @aux._keepstate_method
-    def _read_header
+    def in_read_header
       _read_header_lines(@_source)
+    end
+    def _read_header
+      _keepstate_method(:in_read_header)
+      in_read_header
     end
   
     def _read_spectrum
@@ -302,7 +313,7 @@ module Mgf
     end
   
     # @aux._keepstate_method
-    def get_spectrum(title)
+    def in_get_spectrum(title)
       @_source.each do |line|
         sline = line.strip
         if sline[0...5] == 'TITLE' && sline.split('=', 2)[1].strip == title
@@ -310,7 +321,11 @@ module Mgf
           spectrum['params']['title'] = title
           return spectrum
         end
-      end
+      end  
+    end
+    def get_spectrum(title)
+      _keepstate_method(:in_get_spectrum)
+      in_get_spectrum(title)
     end
   
     def __getitem__(key)
@@ -334,8 +349,8 @@ module Mgf
   end
   
   # @aux._keepstate
-  def read_header(source)
-    source = File_obj.new(source, 'r')
+  def in_read_header(source)
+    source = File_helpers::File_obj.new(source, 'r')
     header = {}
     source = source.lines
     source.each do |line|
@@ -350,7 +365,11 @@ module Mgf
     if header.include?('charge')
       header['charge'] = _parse_charge(header['charge'], list_only: true)
     end
-    header
+    header  
+  end
+  def read_header(source)
+    _keepstate(:in_read_header)
+    in_read_header(source)
   end
   
   Default_key_order = ['title', 'pepmass', 'rtinseconds', 'charge']
@@ -484,5 +503,5 @@ module Mgf
     output
   end
   
-  Chain = _make_chain('Read', Read)
+  Chain = File_helpers._make_chain('Read', Read)
 end

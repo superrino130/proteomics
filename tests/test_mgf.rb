@@ -18,6 +18,9 @@ np = Numpy
 # from pyteomics import mgf, auxiliary as aux
 # import data
 require_relative '../rbteomics/mgf'
+require_relative '../rbteomics/auxiliary/file_helpers'
+require_relative '../rbteomics/auxiliary/structures'
+require_relative '../rbteomics/auxiliary/utils'
 require 'set'
 
 

@@ -10,7 +10,8 @@ require 'set'
 module Pepxml
   module_function
   class PepXML
-  #class PepXML(xml.MultiProcessingXML, xml.IndexSavingXML):
+    extend File_helpers
+    extend File_helpers::IndexSavingMixin
     include Xml::IndexSavingXML
     include Xml::MultiProcessingXML
   
@@ -29,31 +30,11 @@ module Pepxml
       'bool' => Set.new(['is_rejected']),
       'floatarray' => Set.new(['all_ntt_prob'])
     }
-    
-    # def initialize(...)
-    #   __init__(...)
-    # end
-    
-    # def __init__(...)
-    #   @_index_class = HierarchicalOffsetIndex.new
-    # end
-  
-      # # from class IndexSavingXML
-      # def _read_byte_offsets
-      #   File.open(@_byte_offset_filename, 'r') { |f|
-      #     index = @_index_class.load(f)
-      #     if index.schema_version.nil?
-      #       raise TypeError("Legacy Offset Index!")
-      #     end
-      #     @_offset_index = index
-      #   }
-      # end
-      
-      # # from class MultiProcessingXML
-      # def _task_map_iterator
-      #   @_offset_index[self._default_iter_tag].to_enum
-      # end
-    
+
+    def initialize(...)
+      __init__(...)
+    end
+        
     def _get_info_smart(element, **kwargs)
       if kwargs.include?('ename')
         name = kwargs.delete('ename')
@@ -163,7 +144,7 @@ module Pepxml
     
   Read = lambda do |source, **kwargs|
     read_schema = kwargs['read_schema'] || false
-    iterative = kwargs['iterative'] ||  true
+    iterative = kwargs['iterative'] || true
     PepXML.new(source, 'read_schema' => read_schema, 'iterative' => iterative)
   end
     
@@ -197,7 +178,7 @@ module Pepxml
     roc_curve
   end
   
-  Chain = ChainBase._make_chain('Read', Read)
+  Chain = File_helpers::ChainBase._make_chain('Read', Read)
   
   @_is_decoy_prefix = lambda do |psm, prefix: 'DECOY_'|
     psm['search_hit'][0]['proteins'].all?{ |protein| protein['protein'].start_with(prefix) }

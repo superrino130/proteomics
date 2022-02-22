@@ -110,7 +110,7 @@ module Tandem
     TandemXML.new(source, **kwargs).iterfing(path, **kwargs)
   end
   
-  Chain = ChainBase._make_chain(TandemXML)
+  Chain = File_helpers::ChainBase._make_chain(TandemXML)
   
   @_is_decoy_prefix = lambda do |psm, prefix='DECOY_'|
     psm['protein'].all?{ |prot| prot['label'].start_with?(prefix) }
