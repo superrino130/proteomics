@@ -30,14 +30,14 @@ class MGFTest < Minitest::Test
     @_encoding = 'utf-8'
     @path = 'tests/test.mgf'
     @header = Mgf.read_header(@path)
-    f = Mgf::Read.call(@path)
+    # f = Mgf::Read.call(@path)
     # @spectra = f.to_a
   end
 
   def test_read
     # assert_equal Mgf_spectra_long, Mgf::Read.call(@path)
-    # assert_equal Mgf_spectra_long, Mgf::MGF.new(@path)
-    assert_equal Mgf_spectra_long, Mgf::IndexedMGF.new(@path)
+    assert_equal Mgf_spectra_long, Mgf::MGF.new(@path)
+    # assert_equal Mgf_spectra_long, Mgf::IndexedMGF.new(@path)
 
 
   end

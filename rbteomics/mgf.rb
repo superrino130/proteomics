@@ -18,33 +18,31 @@ module Mgf
   
   module MGFBase
     module_function
-
-    attr_reader :_comments
-  
-    @@_comments = Set.new('#;!/'.split(''))
-    @@_array = lambda { |x, dtype| Numpy.array(x, dtype: dtype) }
-    @@_ma = lambda { |x, dtype| Numpy.ma.masked_equal(Numpy.array(x, dtype: dtype), 0) }
-    @@_identity = lambda { |x, **kw| x }
-    @@_array_converters = {
-        'm/z array' => [@_identity, @_array, @_array],
-        'intensity array' => [@_identity, @_array, @_array],
-        'charge array' => [@_identity, @_array, @_ma],
-        'ion array' => [@_identity, @_array,  @_array]
-    }
-    @@_array_keys = ['m/z array', 'intensity array', 'charge array', 'ion array']
-    @@_array_keys_unicode = ['m/z array', 'intensity array', 'charge array', 'ion array']
-    @@encoding = nil
-  
+    
     def __init__(source, **kwargs)
       super
       @_source = source
+      @_comments = Set.new('#;!/'.split(''))
+      @_array = lambda { |x, dtype| Numpy.array(x, dtype: dtype) }
+      @_ma = lambda { |x, dtype| Numpy.ma.masked_equal(Numpy.array(x, dtype: dtype), 0) }
+      @_identity = lambda { |x, **kw| x }
+      @_array_converters = {
+          'm/z array' => [@_identity, @_array, @_array],
+          'intensity array' => [@_identity, @_array, @_array],
+          'charge array' => [@_identity, @_array, @_ma],
+          'ion array' => [@_identity, @_array,  @_array]
+      }
+      @_array_keys = ['m/z array', 'intensity array', 'charge array', 'ion array']
+      @_array_keys_unicode = ['m/z array', 'intensity array', 'charge array', 'ion array']
+      @encoding = nil
+
       @_use_header = kwargs.delete('use_header') || true
       @_convert_arrays = kwargs.delete('convert_arrays') || 2
       @_read_charges = kwargs.delete('read_charges') || true
       @_read_ions = kwargs.delete('read_ions') || false
       @_read_charges = false if @_read_ions
       dtype = kwargs.delete('dtype') || nil
-      @_dtype_dict = dtype.instance_of?(Hash) ? dtype : @@_array_keys.map{ [_1.to_s, dtype] }.to_h
+      @_dtype_dict = dtype.instance_of?(Hash) ? dtype : @_array_keys.map{ [_1.to_s, dtype] }.to_h
       if @_use_header
         _read_header()
       else
@@ -178,8 +176,6 @@ module Mgf
             File_helpers::IndexSavingTextReader,
             File_helpers
     
-    @@delimiter = 'BEGIN IONS'
-  
     def initialize(...)
       __init__(...)
     end
@@ -202,6 +198,7 @@ module Mgf
       
       @label = kwargs['index_by_scans'] ? 'SCANS=(\d+)\s*' : 'TITLE=([^\n]*\S)\s*'
       super
+      @delimiter = 'BEGIN IONS'
     end
   
     def __reduce_ex__(protocol)
@@ -301,14 +298,14 @@ module Mgf
       in_read_header
     end
   
-    def _read_spectrum
-      _read_spectrum_lines(@_source)
+    Read_spectrum = lambda do |source|
+      _read_spectrum_lines(source)
     end
   
-    RRead = lambda do |*args|
-      @_source.each do |line|
+    RRead = lambda do |source|
+      source.each do |line|
         if line.strip == 'BEGIN IONS'
-          yield _read_spectrum()
+          yield Read_spectrum.call(source)
         end
       end
     end

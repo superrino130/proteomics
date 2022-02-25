@@ -149,7 +149,7 @@ module File_helpers
       @_args = args
       @_kwargs = kwargs
       reset() if self.class == IteratorContextManager
-      # super
+      super
     end
   
     def __getstate__()
@@ -196,7 +196,7 @@ module File_helpers
   # @add_metaclass(ABCMeta)
   module FileReader
     module_function
-    include IteratorContextManager
+    prepend IteratorContextManager
     def __init__(source, **kwargs)
       func = kwargs['parser_func']
       super(*kwargs['args'], 'parser_func' => func, **kwargs['kwargs'])
@@ -204,28 +204,28 @@ module File_helpers
       @_source_init = source
       @_mode = kwargs['mode']
       @_encoding = kwargs['encoding']
-      reset()
+      reset(self)
     end
   
-    def reset
-      if self.respond_to?(:_source)
+    def reset(cls)
+      if cls.respond_to?(:_source)
         @_source.__exit__(nil, nil, nil)
       end
-      @_source = File_obj.new(@_source_init, @_mode, encoding: @_encoding)
+      @_source = File_obj.new(@_source_init, @_mode, encoding: @_encoding).lines.readlines
       begin
-        if @_pass_file
-          @_reader = @_func.call(@_source, @_args, **@_kwargs)
+        if @_pass_file.!
+          @_reader = @_func.call(@_source, *@_args, **@_kwargs)
         else
           @_reader = @_func.call(*@_args, **@_kwargs)
         end
       rescue => exception
-        @_source.__exit__(exception.message, exception.backtrace)
+        # @_source.__exit__(exception.message, exception.backtrace)
         raise
       end
     end
   
     def __exit__(*args, **kwargs)
-      @_souce.__exit__(args, kwargs)
+      @_source.__exit__(args, kwargs)
     end
   
     def __getattr__(attr)
@@ -422,16 +422,16 @@ module File_helpers
   module IndexedTextReader
     include IndexedReaderMixin
     include FileReader
-    @@delimiter = nil
-    @@label = nil
-    @@block_size = 1000000
-    @@label_group = 1
   
     module_function
   
     def __init__(source, **kwargs)
       encoding = kwargs.delete('encoding') || 'utf-8'
       super(source, 'mode' => 'rb', 'encoding' => nil, **kwargs)
+      @delimiter = nil
+      @label = nil
+      @block_size = 1000000
+      @label_group = 1
     
       @encoding = encoding
       ['delimiter', 'label', 'block_size', 'label_group'].each do |attr|

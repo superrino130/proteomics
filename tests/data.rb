@@ -1300,9 +1300,9 @@ Mzid_spectra = {
                                 'spectrumID' => 'databasekey=40'}]}
 
 # mzml_mz_array = Numpy.load('./test_mzml_mz.npy')
-mzml_mz_array = Numpy.load("C:\\Users\\user\\Documents\\csc\\ruby\\proteomics\\tests\\test_mzml_mz.npy")
+# mzml_mz_array = Numpy.load("C:\\Users\\user\\Documents\\csc\\ruby\\proteomics\\tests\\test_mzml_mz.npy")
 # mzml_int_array = Numpy.load('./test_mzml_intensity.npy')
-mzml_int_array = Numpy.load("C:\\Users\\user\\Documents\\csc\\ruby\\proteomics\\tests\\test_mzml_intensity.npy")
+# mzml_int_array = Numpy.load("C:\\Users\\user\\Documents\\csc\\ruby\\proteomics\\tests\\test_mzml_intensity.npy")
 Mzml_spectra = [
   {'MSn spectrum' => '',
     'base peak intensity' => 1471973.875,
@@ -1312,9 +1312,9 @@ Mzml_spectra = [
     'highest observed m/z' => 2000.0099466203771,
     'id' => 'controllerType=0 controllerNumber=1 scan=1',
     'index' => 0,
-    'intensity array' => makeCA(mzml_int_array),
+    # 'intensity array' => makeCA(mzml_int_array),
     'lowest observed m/z' => 200.00018816645022,
-    'm/z array' => makeCA(mzml_mz_array),
+    # 'm/z array' => makeCA(mzml_mz_array),
     'ms level' => 1,
     'positive scan' => '',
     'profile spectrum' => '',
@@ -1337,9 +1337,9 @@ Mzml_spectra = [
                  'highest observed m/z' => 2000.0099466203771,
                  'id' => 'controllerType=0 controllerNumber=1 scan=2',
                  'index' => 1,
-                 'intensity array' => makeCA(mzml_int_array),
+                #  'intensity array' => makeCA(mzml_int_array),
                  'lowest observed m/z' => 200.00018816645022,
-                 'm/z array' => makeCA(mzml_mz_array),
+                #  'm/z array' => makeCA(mzml_mz_array),
                  'ms level' => 1,
                  'positive scan' => '',
                  'profile spectrum' => '',
