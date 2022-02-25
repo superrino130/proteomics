@@ -12,9 +12,9 @@ require_relative 'auxiliary/file_helpers'
 require 'set'
 
 module Mgf
-  extend File_helpers
-  
   module_function
+
+  extend File_helpers
   
   module MGFBase
     module_function
@@ -36,6 +36,7 @@ module Mgf
     @@encoding = nil
   
     def __init__(source, **kwargs)
+      super
       @_source = source
       @_use_header = kwargs.delete('use_header') || true
       @_convert_arrays = kwargs.delete('convert_arrays') || 2
@@ -171,10 +172,11 @@ module Mgf
   end
   
   class IndexedMGF
-    include File_helpers::TaskMappingMixin
-    include File_helpers::TimeOrderedIndexedReaderMixin
-    include File_helpers::IndexSavingTextReader
-    include MGFBase
+    include MGFBase,
+            File_helpers::TaskMappingMixin,
+            File_helpers::TimeOrderedIndexedReaderMixin,
+            File_helpers::IndexSavingTextReader,
+            File_helpers
     
     @@delimiter = 'BEGIN IONS'
   
@@ -193,12 +195,13 @@ module Mgf
       kwargs['read_ions'] ||= false
       kwargs['_skip_index'] ||= false
   
-      kwargs['parser_func'] = Read
+      kwargs['parser_func'] = RRead
       kwargs['pass_file'] = false
       kwargs['args'] = []
       kwargs['kwargs'] = {}
       
       @label = kwargs['index_by_scans'] ? 'SCANS=(\d+)\s*' : 'TITLE=([^\n]*\S)\s*'
+      super
     end
   
     def __reduce_ex__(protocol)
@@ -240,7 +243,7 @@ module Mgf
       rescue => exception
         first = -1
       end
-      header_lines = read(first).encode(@encoding).split("\n")
+      header_lines = Read.call(first).encode(@encoding).split("\n")
       _read_header_lines(header_lines)
     end
     def _read_header
@@ -254,7 +257,7 @@ module Mgf
       _read_spectrum_lines(lines)
     end
   
-    Read = lambda do |**kwargs|
+    RRead = lambda do |**kwargs|
       @_offset_index.each do |_, offsets|
         spectrum = _item_from_offsets(offsets)
         yield spectrum
@@ -267,9 +270,7 @@ module Mgf
   end
   
   class MGF
-    include File_helpers
-    include File_helpers::FileReader
-    include MGFBase
+    include MGFBase, File_helpers::FileReader, File_helpers
   
     def initialize(...)
       __init__(...)
@@ -284,7 +285,7 @@ module Mgf
       kwargs['encoding'] ||= nil
   
       kwargs['mode'] = 'r'
-      kwargs['parser_func'] = Read
+      kwargs['parser_func'] = RRead
       kwargs['pass_file'] = false
       kwargs['args'] = []
       kwargs['kwargs'] = {}
@@ -304,7 +305,7 @@ module Mgf
       _read_spectrum_lines(@_source)
     end
   
-    Read = lambda do
+    RRead = lambda do |*args|
       @_source.each do |line|
         if line.strip == 'BEGIN IONS'
           yield _read_spectrum()

@@ -35,21 +35,9 @@ class MGFTest < Minitest::Test
   end
 
   def test_read
-    # for func in [mgf.read, mgf.MGF, mgf.IndexedMGF]:
-    #   # http://stackoverflow.com/q/14246983/1258041
-    #   self.assertEqual(data.mgf_spectra_long, list(func(self.path)))
-    #   self.assertEqual(data.mgf_spectra_short, list(func(self.path, False)))
-    #   with func(self.path) as reader:
-    #       self.assertEqual(data.mgf_spectra_long, list(reader))
-    #   with func(self.path, False) as reader:
-    #       self.assertEqual(data.mgf_spectra_short, list(reader))
-
-    assert_equal Mgf_spectra_long, Mgf::Read.call(@path)
-      # self.assertEqual(data.mgf_spectra_short, list(func(self.path, False)))
-      # with func(self.path) as reader:
-      #     self.assertEqual(data.mgf_spectra_long, list(reader))
-      # with func(self.path, False) as reader:
-      #     self.assertEqual(data.mgf_spectra_short, list(reader))
+    # assert_equal Mgf_spectra_long, Mgf::Read.call(@path)
+    # assert_equal Mgf_spectra_long, Mgf::MGF.new(@path)
+    assert_equal Mgf_spectra_long, Mgf::IndexedMGF.new(@path)
 
 
   end

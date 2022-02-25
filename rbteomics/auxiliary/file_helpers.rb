@@ -136,7 +136,6 @@ module File_helpers
   end
   
   module NoOpBaseReader
-    module_function
     def __init__(...)
       # PASS
     end
@@ -432,7 +431,8 @@ module File_helpers
   
     def __init__(source, **kwargs)
       encoding = kwargs.delete('encoding') || 'utf-8'
-  
+      super(source, 'mode' => 'rb', 'encoding' => nil, **kwargs)
+    
       @encoding = encoding
       ['delimiter', 'label', 'block_size', 'label_group'].each do |attr|
         if kwargs.include?(attr)
@@ -440,7 +440,7 @@ module File_helpers
         end
       end
       @_offset_index = nil
-      if kwargs.delete('_skip_index').!
+      if (kwargs.delete('_skip_index') || false).!
           @_offset_index = build_byte_index()
       end
     end
@@ -1001,7 +1001,6 @@ module File_helpers
   
   module TaskMappingMixin
     include NoOpBaseReader
-    module_function
     def __init__(*args, **kwargs)
       @_queue_size = kwargs.delete('queue_size') || QUEUE_SIZE
       @_queue_timeout = kwargs.delete('timeout') || QUEUE_TIMEOUT

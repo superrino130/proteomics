@@ -1300,9 +1300,9 @@ Mzid_spectra = {
                                 'spectrumID' => 'databasekey=40'}]}
 
 # mzml_mz_array = Numpy.load('./test_mzml_mz.npy')
-mzml_mz_array = Numpy.load("C:\\Users\\2021g000\\Documents\\naka\\github\\proteomics\\tests\\test_mzml_mz.npy")
+mzml_mz_array = Numpy.load("C:\\Users\\user\\Documents\\csc\\ruby\\proteomics\\tests\\test_mzml_mz.npy")
 # mzml_int_array = Numpy.load('./test_mzml_intensity.npy')
-mzml_int_array = Numpy.load("C:\\Users\\2021g000\\Documents\\naka\\github\\proteomics\\tests\\test_mzml_intensity.npy")
+mzml_int_array = Numpy.load("C:\\Users\\user\\Documents\\csc\\ruby\\proteomics\\tests\\test_mzml_intensity.npy")
 Mzml_spectra = [
   {'MSn spectrum' => '',
     'base peak intensity' => 1471973.875,

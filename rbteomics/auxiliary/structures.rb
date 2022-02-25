@@ -47,19 +47,17 @@ class PyteomicsError < Exception
   end
 end
 
-class Charge < Integer
-  def initialize(...)
-    __new__(...)
-  end
-
-  def __new__(*args, **kwargs)
+class Charge < Array
+  def initialize(*args, **kwargs)
     begin
-      return super
+      self << args[0].to_i
+      return
     rescue => exception
       if args[0].instance_of?(String)
         begin
           num, sign = /^(\d+)(\+|-)$/.match(args[0])
-          return super(sign + num, args[1..-1], kwargs)
+          self << super(sign + num, args[1..-1], kwargs)
+          return
         rescue => exception
           # pass
         end
@@ -100,6 +98,7 @@ class ChargeList < Array
     if ['', 0, nil, [], {}].include?(args).! || args[0].instance_of?(String)
       delim = /(?:,\s*)|(?:\s*and\s*)/
       args[0].split(delim.match(args[0]).to_s).each do |e|
+        e = Charge.new(e)[0].to_i
         self << e
       end
     else
@@ -108,7 +107,7 @@ class ChargeList < Array
       rescue => exception
         super(*args, **kwargs)
       end
-      self[0] = Charge.new(self[0])
+      self[0] = Charge.new(self[0])[0].to_i
     end
   end
 
@@ -126,7 +125,7 @@ end
 def _parse_charge(s, list_only: false)
   if list_only.!
     begin
-      return Charge.new(s)
+      return Charge.new(s)[0].to_i
     rescue => exception
       # pass
     end
