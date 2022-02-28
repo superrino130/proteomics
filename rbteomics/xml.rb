@@ -49,7 +49,8 @@ module Xml
   
   module XMLValueConverter
     module_function
-    @@_duration_parser = Regexp.compile('(?P<sign>-?)P(?:(?P<years>\d+\.?\d*)Y)?(?:(?P<months>\d+\.?\d*)M)?(?:(?P<days>\d+\.?\d*)D)?(?:T(?:(?P<hours>\d+\.?\d*)H)?(?:(?P<minutes>\d+\.?\d*)M)?(?:(?P<seconds>\d+\.?\d*)S)?)?')
+    # @@_duration_parser = Regexp.compile('(?P<sign>-?)P(?:(?P<years>\d+\.?\d*)Y)?(?:(?P<months>\d+\.?\d*)M)?(?:(?P<days>\d+\.?\d*)D)?(?:T(?:(?P<hours>\d+\.?\d*)H)?(?:(?P<minutes>\d+\.?\d*)M)?(?:(?P<seconds>\d+\.?\d*)S)?)?')
+    @@_duration_parser = Regexp.compile('(?<sign>-?)\D*(?<years>\d+\.?\d*)\D*(?<months>\d+\.?\d*)\D*(?<days>\d+\.?\d*)\D*(?<hours>\d+\.?\d*)\D*(?<minutes>\d+\.?\d*)\D*(?<seconds>\d+\.?\d*)')
     
     Duration_str_to_float = lambda do |s|
       if s.start_with?('P').!
@@ -116,30 +117,30 @@ module Xml
     extend File_helpers
     extend File_helpers::FileReader
     module_function
-
-    @@file_format = 'XML'
-    @@_root_element = nil
-    @@_default_schema = {}
-    @@_read_schema = false
-    @@_default_version = 0
-    @@_default_iter_tag = nil
-    @@_default_iter_path = nil
-    @@_structures_to_flatten = []
-    @@_schema_location_param = 'schemaLocation'
-    @@_default_id_attr = 'id'
-    @@_huge_tree = false
-    @@_retrieve_refs_enabled = nil  # only some subclasses implement this
-    @@_iterative = true
-
-    # Configurable plugin logic
-    @@_converters = XMLValueConverter.converters()
-    @@_element_handlers = {}
     
     def _get_info_smart(element, **kwargs)
       raise NotImplementedError
     end
   
     def __init__(source, **kwargs)
+      @file_format ||= 'XML'
+      @_root_element ||= nil
+      @_default_schema ||= {}
+      @_read_schema ||= false
+      @_default_version ||= 0
+      @_default_iter_tag ||= nil
+      @_default_iter_path ||= nil
+      @_structures_to_flatten ||= []
+      @_schema_location_param ||= 'schemaLocation'
+      @_default_id_attr ||= 'id'
+      @_huge_tree ||= false
+      @_retrieve_refs_enabled ||= nil  # only some subclasses implement this
+      @_iterative ||= true
+  
+      # Configurable plugin logic
+      @_converters ||= XMLValueConverter.converters()
+      @_element_handlers ||= {}
+  
       read_schema = kwargs['read_schema'] || nil
       iterative = kwargs['iterative'] || nil
       build_id_cache = kwargs['build_id_cache'] || false
@@ -613,7 +614,7 @@ module Xml
       'lt' => '<',
       'gt' => '>'
     }
-    @@xml_entity_pattern = Regexp.compile("&(#{entities.keys.join('|')});")
+    @@xml_entity_pattern = Regexp.compile("&(#{@@entities.keys.join('|')});")
 
     def initialize(...)
       __init__(...)
@@ -731,7 +732,7 @@ module Xml
       items().sum{ |_, group| group.size }
     end
   
-    def self.build(source, indexed_tags: nil, keys: nil)
+    def self.build(cls, source, indexed_tags: nil, keys: nil)
       indexer = cls(source, indexed_tags, keys)
       indexer.offsets
     end
@@ -761,12 +762,12 @@ module Xml
     include File_helpers::IndexedReaderMixin
 
     module_function
-
-    @@_indexed_tags = Set.new
-    @@_indexed_tag_keys = {}
-    @@_use_index = true
   
     def __init__(source, *args, **kwargs)
+      @_indexed_tags ||= Set.new
+      @_indexed_tag_keys ||= {}
+      @_use_index ||= true
+  
       kwargs['read_schema'] ||= false
       kwargs['iterative'] ||= true
       kwargs['build_id_cache'] ||= false
@@ -833,7 +834,7 @@ module Xml
       if ['', 0, nil, false, [], {}].include?(@_indexed_tags) || ['', 0, nil, false, [], {}].include?(@_use_index)
         return
       end
-      @_offset_index = TagSpecificXMLByteIndex.build(
+      @_offset_index = TagSpecificXMLByteIndex.build(self,
         @_source, indexed_tags: @_indexed_tags, keys: @_indexed_tag_keys)
     end
     def self._build_index

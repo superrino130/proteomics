@@ -72,6 +72,10 @@ plt.show()
 を経て、グラフが表示されます。
 ![example1実行結果](./example1.png)
 
+[EXAMPLE 2: Fragmentation - Pyteomics](https://pyteomics.readthedocs.io/en/latest/examples/example_msms.html)
+![example2実行結果](./example2.png)
+
+
 # テスト進捗（完了他）
 + test_electrochem.rb
 + test_parser.rb

@@ -501,7 +501,7 @@ module File_helpers
   end
   
   module IndexSavingMixin
-    extend File_helpers
+    include File_helpers
     include NoOpBaseReader
   
     module_function

@@ -1,11 +1,7 @@
-# from pyteomics import mgf, pepxml, mass
-require_relative 'rbteomics/mgf'
-require_relative 'rbteomics/pepxml'
 require_relative 'rbteomics/mass/mass'
+require_relative 'rbteomics/xml'
+require_relative 'rbteomics/_schema_defaults'
 
-# import os
-# from urllib.request import urlopen, Request
-# import pylab
 require 'matplotlib/pyplot'
 plt = Matplotlib::Pyplot
 require 'set'
@@ -25,147 +21,234 @@ require 'open-uri'
   end
 end
 
+module Pepxml
+  class PepXML < Array
+    def initialize(source, ...)
+      @source = source
+
+      @file_format ||= 'pepXML'
+      @_root_element ||= 'msms_pipeline_analysis'
+      @_default_schema ||= Pepxml_schema_defaults
+      @_default_version ||= '1.15'
+      @_default_iter_tag ||= 'spectrum_query'
+      @_indexed_tags ||= Set.new(['spectrum_query'])
+      @_indexed_tag_keys ||= {'spectrum_query' => 'spectrum'}
+      @_default_id_attr ||= 'spectrum'
+      @_structures_to_flatten ||= Set.new(['search_score_summary', 'modification_info'])
+      @_convert_items ||= {
+        'float' => Set.new(['calc_neutral_pep_mass', 'massdiff', 'probability', 'variable', 'static']),
+        'int' => Set.new(['start_scan', 'end_scan', 'index', 'num_matched_peptides']),
+        'bool' => Set.new(['is_rejected']),
+        'floatarray' => Set.new(['all_ntt_prob'])
+      }
+  
+      self.clear
+      read
+    end
+
+    def convert_items(item, value)
+      case item
+      when 'retention_time_sec', 'precursor_neutral_mass', 'Morpheus Score', 'PSM q-value', 'calc_neutral_pep_mass', 'massdiff'
+        value.to_f
+      when 'assumed_charge', 'start_scan', 'end_scan', 'index', 'hit_rank', 'num_tol_term', 'num_tot_proteins', 'num_matched_ions', 'tot_num_ions'
+        value.to_i
+      when 'is_rejected'
+        value == '0' ? false : true
+      else
+        value
+      end
+    end
+
+    def read
+      ss_flg = false
+      c1_cnt = -1
+      c2_cnt = -1
+      c3_cnt = -1
+
+      IO.foreach(@source) do |line|
+        if line.include?('<' + @_default_iter_tag)
+          c1_cnt += 1
+          c2_cnt = -1
+          c3_cnt = -1
+          if c1_cnt > 0
+            return
+          end
+          self << {}
+          line.split.each do |param|
+            if param.include?('=')
+              key = param.split('=')[0]
+              value = param.match(Regexp.new(key + '=\"(.*?)\"'))[1]
+              self[c1_cnt][key] = convert_items(key, value)
+            end
+          end
+        end
+        if c1_cnt >= 0
+          if line.include?('<search_hit')
+            self[c1_cnt]['search_hit'] ||= []
+            c2_cnt += 1
+            c3_cnt = -1
+            self[c1_cnt]['search_hit'] << {}
+            key = ''
+            line.split[1..].each do |param|
+              if param.include?('="')
+                key = param.split('=')[0]
+                if param.match?(Regexp.new(key + '=\"(.*?)\"'))
+                  value = param.match(Regexp.new(key + '=\"(.*?)\"'))[1]
+                else
+                  value = param.sub(key + '="', '')
+                end
+                if key == 'hit_rank'
+                  c3_cnt += 1
+                  self[c1_cnt]['search_hit'][c2_cnt]['proteins'] ||= []
+                  self[c1_cnt]['search_hit'][c2_cnt]['proteins'] << {}
+                end
+                if ['protein', 'protein_descr', 'peptide_next_aa', 'peptide_prev_aa', 'num_tol_term'].include?(key)
+                  self[c1_cnt]['search_hit'][c2_cnt]['proteins'][c3_cnt][key] = convert_items(key, value)
+                else
+                  self[c1_cnt]['search_hit'][c2_cnt][key] = convert_items(key, value)
+                end
+              else
+                self[c1_cnt]['search_hit'][c2_cnt]['proteins'][c3_cnt][key] += ' ' + param
+                self[c1_cnt]['search_hit'][c2_cnt]['proteins'][c3_cnt][key].chop! if self[c1_cnt]['search_hit'][c2_cnt]['proteins'][c3_cnt][key][-1] == '>'
+                self[c1_cnt]['search_hit'][c2_cnt]['proteins'][c3_cnt][key].chop! if self[c1_cnt]['search_hit'][c2_cnt]['proteins'][c3_cnt][key][-1] == '"'
+              end
+            end
+          elsif line.include?('<search_score')
+            self[c1_cnt]['search_hit'][c2_cnt]['search_score'] ||= {}
+            key = line.match(Regexp.new('name=\"(.*?)\"'))[1]
+            value = line.match(Regexp.new('value=\"(.*?)\"'))[1]
+            self[c1_cnt]['search_hit'][c2_cnt]['search_score'][key] = convert_items(key, value)
+          end
+        end
+      end
+    end
+  end
+end
+
 def fragments(peptide, types: ['b', 'y'], maxcharge: 1)
-  Fiber.new do
+  arr = []
     1.upto(peptide.size - 2) do |i|
       types.each do |ion_type|
         1.upto(maxcharge) do |charge|
           if 'abc'.include?(ion_type[0])
-            Fiber.yield fast_mass(peptide[0...i], ion_type: ion_type, charge: charge)
+            arr << fast_mass(peptide[0...i], ion_type: ion_type, charge: charge)
           else
-            Fiber.yield fast_mass(peptide[i..], ion_type: ion_type, charge: charge)
+            arr << fast_mass(peptide[i..], ion_type: ion_type, charge: charge)
           end
         end
       end
-    end  
+    end
+  arr
+end
+
+module Mgf
+  class MGFBase < Array
+    def initialize(path)
+      @path = path
+      self.clear
+    end
+
+    def self.parse_precursor_charge(charge_text, list_only: false)
+      _parse_charge(charge_text, list_only: list_only)
+    end
+  
+    def self.parse_peak_charge(charge_text, list_only: false)
+      _parse_charge(charge_text, list_only: false)
+    end
+  
+    def self.parse_peak_ion(ion_text)
+      _parse_ion(ion_text)
+    end
+  end
+
+  class MGF < MGFBase
+    def initialize(path)
+      super
+    end
+
+    def parser
+      h = {}
+      d = []
+      di = -1
+      File.open(@path) do |f|
+        f.readlines.each do |line|
+          if line.chomp.empty?
+            next
+          elsif line.include?('BEGIN IONS')
+            di += 1
+            d[di] = {'intensity array' => [], 'm/z array' => [], 'params' => {}}
+          elsif line.include?('END IONS')
+            # PASS
+          elsif di < 0
+            k, v = line.chomp.split('=')
+            h[k.downcase] = v if k.nil?.!
+          else
+            if line.include?('=')
+              k, v = line.chomp.split('=')
+              d[di]['params'][k.downcase] = v
+            else
+              ma, ia = line.split.map(&:to_f)
+              d[di]['intensity array'] << ia
+              d[di]['m/z array'] << ma
+            end
+          end
+        end
+      end
+      d.each do |elems|
+        elems.keys.each do |key|
+          if key == 'params'
+            elems[key] = (elems[key].to_a + h.to_a).sort_by{ _1[0] }.to_h
+          end
+        end
+        elems['charge array'] = [] if elems.include?('charge array').!
+        self << elems
+      end
+      fix
+    end
+
+    def fix
+      self.each do |elems|
+        elems['params'].keys.each do |key|
+          case key
+          when 'pepmass'
+            pm = elems['params'][key].split.map(&:to_f)
+            # if pm.size > 1
+              ch = MGFBase.parse_precursor_charge(elems['params']['charge'], list_only: true)
+            # else
+            #   ch = [MGFBase.parse_precursor_charge(elems['params']['charge'], list_only: false)]
+            # end
+            if ch.size == pm.size
+              elems['params'][key] = pm
+              elems['params']['charge'] = ch
+            elsif ch.size > pm.size
+              elems['params'][key] = pm + [nil] * (ch.size - pm.size)
+              elems['params']['charge'] = ch[0, pm.size]
+            end
+          when 'rtinseconds'
+            elems['params'][key] = elems['params'][key].to_f
+          end
+        end
+      end
+    end
   end
 end
 
-spectrum = Mgf::Read.call('example.mgf')
-psms = Pepxml::Read.call('example.pep.xml')
+include Mgf
+include Pepxml
 
+path = 'example.mgf'
+spectrum = Mgf::MGF.new(path).parser[0]
 
-
-Mgf::Read.call('example.mgf') do |spectra|
-  # File.open('example.pep.xml') do |psms|
-    spectrum = _next(spectra)
-    p spectrum
-
-  # end
-end
-
-exit
-# with mgf.read('example.mgf') as spectra, pepxml.read('example.pep.xml') as psms:
-#     spectrum = next(spectra)
-#     psm = next(psms)
-
-
-
-
-exit
-
-
-puts 'Cleaving the proteins with trypsin...'
-unique_peptides = Set.new
-Zlib::GzipReader.open('yeast.fasta.gz') do |gz|
-  gz.read.split('>').each_with_index do |x, i|
-    f = Bio::FastaFormat.new(x)
-    new_peptides = cleave(f.seq, 'trypsin')
-    unique_peptides.merge(new_peptides)
-  end
-end
-puts "Done, #{unique_peptides.size} sequences obtained!"
-
-peptides = unique_peptides.map{ {'sequence' => _1} }
-
-puts 'Parsing peptide sequences...'
-peptides.each do |peptide|
-  peptide['parsed_sequence'] = parse(peptide['sequence'], show_unmodified_termini: true)
-  peptide['length'] = length(peptide['parsed_sequence'])
-end
-puts 'Done!'
-
-peptides = peptides.select{ _1['length'] <= 100 }
-
-puts "peptides.size = #{peptides.size}"
-
-puts 'Calculating the mass, charge and m/z...'
-peptides.each do |peptide|
-  peptide['charge'] = charge(peptide['parsed_sequence'], pH=2.0).round
-  peptide['mass'] = calculate_mass(peptide['parsed_sequence'])
-  peptide['m/z'] = calculate_mass(peptide['parsed_sequence'], **{'charge' => peptide['charge']})
-end
-puts 'Done!'
-
-puts 'Calculating the retention time...'
-peptides.each do |peptide|
-  peptide['RT_RP'] = calculate_RT(
-    peptide['parsed_sequence'],
-    RCs_zubarev)
-  peptide['RT_normal'] = calculate_RT(
-    peptide['parsed_sequence'],
-    RCs_yoshida_lc)
-end
+path = 'example.pep.xml'
+psm = Pepxml::PepXML.new(path)[0]
 
 plt.figure()
-plt.hist(peptides.map{ _1['m/z'] },
-    bins: 2000,
-    range: [0, 4000])
-plt.xlabel('m/z, Th - Ruby')
-plt.ylabel('# of peptides within 2 Th bin')
+plt.title('Theoretical and experimental spectra for ' + psm['search_hit'][0]['peptide'])
+plt.xlabel('m/z, Th by Ruby')
+plt.ylabel('Intensity, rel. units')
 
-plt.show()
+plt.bar(spectrum['m/z array'], spectrum['intensity array'], width: 0.1, linewidth: 2, edgecolor: 'black')
 
-plt.figure()
-plt.hist(peptides.map{ _1['charge'] },
-    bins: 20,
-    range: [0, 10])
-plt.xlabel('charge, e - Ruby')
-plt.ylabel('# of peptides')
-
-plt.show()
-
-x = peptides.map{ _1['RT_RP'] }
-y = peptides.map{ _1['RT_normal'] }
-heatmap, xbins, ybins = np.histogram2d(x, y, bins=100)
-heatmap[heatmap == 0] = np.nan
-a, b, r, stderr = linear_regression(x, y: y)
-
-plt.figure()
-plt.imshow(heatmap)
-plt.xlabel('RT on RP, min - Ruby')
-plt.ylabel('RT on normal phase, min')
-plt.title("All tryptic peptides, RT correlation = #{r}")
-
-plt.show()
-
-x = peptides.map{ _1['m/z'] }
-y = peptides.map{ _1['RT_RP'] }
-heatmap, xbins, ybins = np.histogram2d(x, y,
-    bins: [150, 2000],
-    range: [[0, 4000], [0, 150]])
-heatmap[heatmap == 0] = np.nan
-a, b, r, stderr = linear_regression(x, y: y)
-
-plt.figure()
-plt.imshow(heatmap,
-    aspect: 'auto',
-    origin: 'lower')
-plt.xlabel('m/z, Th - Ruby')
-plt.ylabel('RT on RP, min')
-plt.title("All tryptic peptides, correlation = #{r}")
-
-plt.show()
-
-close_mass_peptides = peptides.select{ 700.0 <= _1['m/z'] && _1['m/z'] <= 701.0 }
-x = close_mass_peptides.map{ _1['RT_RP'] }
-y = close_mass_peptides.map{ _1['RT_normal'] }
-a, b, r, stderr = linear_regression(x, y: y)
-
-plt.figure()
-plt.scatter(x, y)
-plt.xlabel('RT on RP, min - Ruby')
-plt.ylabel('RT on normal phase, min')
-plt.title("Tryptic peptides with m/z=700-701 Th\nRT correlation = #{r}")
-
+theor_spectrum = fragments(psm['search_hit'][0]['peptide'], types: ['b', 'y'], maxcharge: psm['assumed_charge']).select{ _1 < 700 }
+plt.bar(theor_spectrum, [spectrum['intensity array'].max] * theor_spectrum.size, width: 0.1, edgecolor: 'red', alpha: 0.7)
 plt.show()
