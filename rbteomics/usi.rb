@@ -44,29 +44,35 @@ require 'rexml/document'
 module Usi
   module_function
   USI = Struct.new(:USI, :protocol, :dataset, :datafile, :scan_identifier_type, :scan_identifier, :interpretation) do
+    include Usi
     def to_s
       self.select{ |x| x.nil?.! }.join(':')
     end
 
-    def parse(cls, usi)
-      cls.new(*_usi_parser(usi.to_s))
+    def parse
+      self.protocol, self.dataset, self.datafile, self.scan_identifier_type, self.scan_identifier, self.interpretation = _usi_parser(self.USI)
+      self
     end
   end
 
-  def coerce_array(array_data)
-    Numpy.array(array_data.map{ |v| v.to_f })
-  end
+  # def coerce_array(array_data)
+  #   Numpy.array(array_data.map{ |v| v.to_f })
+  # end
 
   def cast_numeric(value)
-    begin
-      return Integer(value)
-    rescue => exception
-      # PASS
-    end
-    begin
-      return Float(value)
-    rescue => exception
+    if value.instance_of?(Integer) || value.instance_of?(Float)
       return value
+    else
+      begin
+        return Float(value)
+      rescue => exception
+        # PASS
+      end
+      begin
+        return Integer(value)
+      rescue => exception
+        raise exception
+      end
     end
   end
 
@@ -77,7 +83,7 @@ module Usi
     datafile = tokens[2]
     scan_identifier_type = tokens[3]
     scan_identifier = tokens[4]
-    interpretation = tokens[5]
+    interpretation = tokens[5] || nil
     [protocol, dataset, datafile, scan_identifier_type, scan_identifier, interpretation]
   end
 
@@ -98,7 +104,7 @@ module Usi
     end
 
     def _request(usi)
-      url = @url_template.sub('{usi}', usi)
+      url = @url_template.sub('{usi!s}', usi)
       @options.each do |k, v|
         url = url.sub("{#{k}}", v.to_s) if url.include?(k)
       end
@@ -127,47 +133,64 @@ module Usi
       result['attributes'].each do |attrib|
         if attrib.include?('value') && attrib['value'].instance_of?(String) && attrib['value'][0].isdigit()
           begin
-            
+            attrib['value'] = cast_numeric(attrib['value'])
           rescue => exception
-            
+            # PASS
           end
         end
-  
       end
-
-
+      result['m/z array'] = coerce_array(data.delete('mzs') || [])
+      result['intensity array'] = coerce_array(data.delete('intensities') || [])
+      data.each do |key, value|
+        if result.include?(key)
+          raise "Attempting to set explicit value for #{key.inspect}"
+        end
+        result[key] = value
+      end
+      result
     end
 
     def __call__(usi)
       get(usi)
     end
-
   end
 
   class PeptideAtlasBackend < PROXIBackend
-    # Not started
-  end
-
-  class MassIVEBackend < PROXIBackend
-    @@_url_template = "http://massive.ucsd.edu/ProteoSAFe/proxi/v{version}/spectra?resultType=full&usi={usi}"
-
     def initialize(...)
+      @_url_template ||= "http://www.peptideatlas.org/api/proxi/v{version}/spectra?resultType=full&usi={usi!s}"
       __init__(...)
     end
 
     def __init__(**kwargs)
-      super('MassIVE', @@_url_template, **kwargs)
+      super('PeptideAtlas', @_url_template, **kwargs)
+    end
+  end
+
+  class MassIVEBackend < PROXIBackend
+    def initialize(...)
+      @_url_template ||= "http://massive.ucsd.edu/ProteoSAFe/proxi/v{version}/spectra?resultType=full&usi={usi}"
+      __init__(...)
+    end
+
+    def __init__(**kwargs)
+      super('MassIVE', @_url_template, **kwargs)
     end
   end
 
   class PRIDEBackend < PROXIBackend
-    # Not started
+    def initialize(...)
+      @_url_template ||= "http://wwwdev.ebi.ac.uk/pride/proxi/archive/v{version}/spectra?resultType=full&usi={usi}"
+      __init__(...)
+    end
+
+    def __init__(**kwargs)
+        super('PRIDE', @_url_template, **kwargs)
+    end
   end
 
   class JPOSTBackend < PROXIBackend
-    @@_url_template = 'https://repository.jpostdb.org/proxi/spectra?resultType=full&usi={usi}'
-
     def initialize(...)
+      @_url_template ||= 'https://repository.jpostdb.org/proxi/spectra?resultType=full&usi={usi}'
       __init__(...)
     end
 
@@ -178,10 +201,21 @@ module Usi
   end
 
   class ProteomeExchangeBackend < PROXIBackend
-    # Not started
+    def initialize(...)
+      @_url_template ||= 'http://proteomecentral.proteomexchange.org/api/proxi/v{version}/spectra?resultType=full&usi={usi!s}'
+      __init__(...)
+    end
+
+    def __init__(**kwargs)
+        super('ProteomeExchange', @_url_template, **kwargs)
+    end
   end
 
   class PROXIAggregator
+    def initialize(...)
+      @_coalesce_resolution_methods = ["first"]
+      __init__(...)
+    end
     # Not started
   end
 

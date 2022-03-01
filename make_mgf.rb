@@ -192,8 +192,8 @@ end
 
 include Mgf
 
-path = 'test.mgf'
-path = 'example.mgf'
+path = 'tests/test.mgf'
+# path = 'example.mgf'
 d = Mgf::MGF.new(path).parser
 p d
 

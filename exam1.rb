@@ -1,9 +1,10 @@
+require 'bio'
 require 'zlib'
 require 'matplotlib/pyplot'
 plt = Matplotlib::Pyplot
 require 'numpy'
 np = Numpy
-require_relative 'rbteomics/fasta'
+# require_relative 'rbteomics/fasta'
 require_relative 'rbteomics/auxiliary/utils'
 require_relative 'rbteomics/auxiliary/math'
 require_relative 'rbteomics/mass/mass'
