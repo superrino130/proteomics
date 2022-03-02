@@ -36,13 +36,17 @@ require_relative 'auxiliary/structures'
 require_relative 'auxiliary/file_helpers'
 require_relative 'auxiliary/utils'
 
+require 'json'
 require 'set'
-require 'open-uri'
-require 'delegate'
+require 'net/http'
 require 'rexml/document'
 
 module Usi
   module_function
+  def coerce_array(array_data)
+    Numpy.array(array_data.map{ |v| v.to_f })
+  end
+
   USI = Struct.new(:USI, :protocol, :dataset, :datafile, :scan_identifier_type, :scan_identifier, :interpretation) do
     include Usi
     def to_s
@@ -54,10 +58,6 @@ module Usi
       self
     end
   end
-
-  # def coerce_array(array_data)
-  #   Numpy.array(array_data.map{ |v| v.to_f })
-  # end
 
   def cast_numeric(value)
     if value.instance_of?(Integer) || value.instance_of?(Float)
@@ -88,6 +88,7 @@ module Usi
   end
 
   class PROXIBackend
+    include Usi
     def initialize(...)
       __init__(...)
     end
@@ -108,15 +109,9 @@ module Usi
       @options.each do |k, v|
         url = url.sub("{#{k}}", v.to_s) if url.include?(k)
       end
-      # req = Request(url)
-      URI.open(url) do |response|
-        if response.status[0] != '200'
-          raise "PROXI Service Response Code #{response.status}"
-        end
-        data = response.read().decode('utf-8')
-        data = json.loads(data)
-        return data
-      end
+      uri = URI.parse(url)
+      res = Net::HTTP.get_response(uri)
+      JSON.parse(res.body)
     end
 
     def get(usi)
@@ -131,7 +126,7 @@ module Usi
       result = {}
       result['attributes'] = data.delete('attributes') || []
       result['attributes'].each do |attrib|
-        if attrib.include?('value') && attrib['value'].instance_of?(String) && attrib['value'][0].isdigit()
+        if attrib.include?('value') && attrib['value'].instance_of?(String) && attrib['value'][0] =~ /\A[0-9]*\z/
           begin
             attrib['value'] = cast_numeric(attrib['value'])
           rescue => exception
@@ -168,7 +163,7 @@ module Usi
 
   class MassIVEBackend < PROXIBackend
     def initialize(...)
-      @_url_template ||= "http://massive.ucsd.edu/ProteoSAFe/proxi/v{version}/spectra?resultType=full&usi={usi}"
+      @_url_template ||= "http://massive.ucsd.edu/ProteoSAFe/proxi/v{version}/spectra?resultType=full&usi={usi!s}"
       __init__(...)
     end
 
@@ -179,7 +174,7 @@ module Usi
 
   class PRIDEBackend < PROXIBackend
     def initialize(...)
-      @_url_template ||= "http://wwwdev.ebi.ac.uk/pride/proxi/archive/v{version}/spectra?resultType=full&usi={usi}"
+      @_url_template ||= "http://wwwdev.ebi.ac.uk/pride/proxi/archive/v{version}/spectra?resultType=full&usi={usi!s}"
       __init__(...)
     end
 
@@ -190,12 +185,12 @@ module Usi
 
   class JPOSTBackend < PROXIBackend
     def initialize(...)
-      @_url_template ||= 'https://repository.jpostdb.org/proxi/spectra?resultType=full&usi={usi}'
+      @_url_template ||= 'https://repository.jpostdb.org/proxi/spectra?resultType=full&usi={usi!s}'
       __init__(...)
     end
 
     def __init__(**kwargs)
-      super('jPOST', @@_url_template, **kwargs)
+      super('jPOST', @_url_template, **kwargs)
       kwargs.delete('version')
     end
   end
