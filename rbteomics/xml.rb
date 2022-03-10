@@ -564,7 +564,7 @@ module Xml
     end
 
     def self._element_handlers
-      @@_element_handlers
+      @_element_handlers
     end
 
     def version_info

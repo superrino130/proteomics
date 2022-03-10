@@ -170,27 +170,25 @@ module Mgf
       h = {}
       d = []
       di = -1
-      File.open(@path) do |f|
-        f.readlines.each do |line|
-          if line.chomp.empty?
-            next
-          elsif line.include?('BEGIN IONS')
-            di += 1
-            d[di] = {'intensity array' => [], 'm/z array' => [], 'params' => {}}
-          elsif line.include?('END IONS')
-            # PASS
-          elsif di < 0
-            k, v = line.chomp.split('=')
-            h[k.downcase] = v if k.nil?.!
+      IO.foreach(@path, chomp: true) do |line|
+        if line.empty?
+          next
+        elsif line.include?('BEGIN IONS')
+          di += 1
+          d[di] = {'intensity array' => [], 'm/z array' => [], 'params' => {}}
+        elsif line.include?('END IONS')
+          # PASS
+        elsif di < 0
+          k, v = line.split('=')
+          h[k.downcase] = v if k.nil?.!
+        else
+          if line.include?('=')
+            k, v = line.split('=')
+            d[di]['params'][k.downcase] = v
           else
-            if line.include?('=')
-              k, v = line.chomp.split('=')
-              d[di]['params'][k.downcase] = v
-            else
-              ma, ia = line.split.map(&:to_f)
-              d[di]['intensity array'] << ia
-              d[di]['m/z array'] << ma
-            end
+            ma, ia = line.split.map(&:to_f)
+            d[di]['intensity array'] << ia
+            d[di]['m/z array'] << ma
           end
         end
       end
