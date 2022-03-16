@@ -19,10 +19,6 @@ require_relative 'auxiliary/utils'
 BaseString ||= String
 
 
-# try:  # Python 2.7
-#     from urllib2 import urlopen, URLError
-# except ImportError:  # Python 3.x
-#     from urllib.request import urlopen, URLError
 require 'set'
 require 'open-uri'
 require 'rexml/document'
@@ -114,8 +110,8 @@ module Xml
   end
 
   module XML
-    extend File_helpers
-    extend File_helpers::FileReader
+    include File_helpers
+    include File_helpers::FileReader
     module_function
     
     def _get_info_smart(element, **kwargs)
@@ -564,7 +560,7 @@ module Xml
     end
 
     def self._element_handlers
-      @_element_handlers
+      @_element_handlers || {}
     end
 
     def version_info
@@ -694,7 +690,7 @@ module Xml
       @indexed_tags = indexed_tags
       @indexed_tag_keys = keys
       @source = source
-      @offsets = HierarchicalOffsetIndex.__init__
+      @offsets = File_helpers::HierarchicalOffsetIndex.__init__(base: nil)
       build_index()
     end
   
@@ -732,18 +728,26 @@ module Xml
       items().sum{ |_, group| group.size }
     end
   
-    def self.build(cls, source, indexed_tags: nil, keys: nil)
-      indexer = cls(source, indexed_tags, keys)
+    def self.build(source, indexed_tags: nil, keys: nil)
+      indexer = self.new(source, indexed_tags: indexed_tags, keys: keys)
       indexer.offsets
     end
   end
   
   def ensure_bytes_single(string)
-    # Not started
+    begin
+      return string.encode(Encoding::UTF_8)
+    rescue => exception
+      raise PyteomicsError.new("#{string.inspect} could not be encoded")
+    end
   end
   
   def ensure_bytes(strings)
-    # Not started
+    if strings.instance_of?(BaseString)
+      strings = [strings]
+    end
+    return strings.map{ |string| ensure_bytes_single(string) }
+
   end
   
   def _flatten_map(hierarchical_map)
@@ -786,6 +790,7 @@ module Xml
           warn('_default_iter_path differs from _default_iter_tag and index is enabled. _default_iter_tag will be used in the index, mind the consequences.')
         end
       end
+      super(source, **kwargs)
   
       @_offset_index = nil
       self._build_index()
@@ -834,7 +839,7 @@ module Xml
       if ['', 0, nil, false, [], {}].include?(@_indexed_tags) || ['', 0, nil, false, [], {}].include?(@_use_index)
         return
       end
-      @_offset_index = TagSpecificXMLByteIndex.build(self,
+      @_offset_index = TagSpecificXMLByteIndex.build(
         @_source, indexed_tags: @_indexed_tags, keys: @_indexed_tag_keys)
     end
     def self._build_index
@@ -904,11 +909,15 @@ module Xml
   end
   
   module IndexSavingXML
+    include Xml
     include IndexedXML
     include File_helpers::IndexSavingMixin
     module_function
     
-    @@_index_class = File_helpers::HierarchicalOffsetIndex.__init__
+    def __init__(...)
+      @_index_class = File_helpers::HierarchicalOffsetIndex.__init__
+      super
+    end
     
     def _read_byte_offsets
       File.open(@_byte_offset_filename, 'r') do |f|

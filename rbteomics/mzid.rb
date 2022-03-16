@@ -17,36 +17,37 @@ module Mzid
     include Xml::IndexSavingXML
     include Xml::MultiProcessingXML
 
-    @@file_format = 'mzIdentML'
-    @@_root_element = 'MzIdentML'
-    @@_default_schema = Mzid_schema_defaults
-    @@_default_version = '1.1.0'
-    @@_default_iter_tag = 'SpectrumIdentificationResult'
-    @@_structures_to_flatten = ['Fragmentation'].to_set
-    @@_indexed_tags = ['SpectrumIdentificationResult', 'SpectrumIdentificationItem',
-                     'SearchDatabase', 'SourceFile', 'SpectraData', 'Sample',
-                     'DBSequence',  'Peptide', 'PeptideEvidence',
-                     'Measure', 'TranslationTable', 'MassTable', 'Enzyme',
-                     'Organization', 'AnalysisSoftware', 'BibliographicReference', 'Person', 'Provider',
-                     'SpectrumIdentificationList', 'SpectrumIdentificationProtocol', 'SpectrumIdentification',
-                     'ProteinDetectionList', 'ProteinDetectionProtocol', 'ProteinDetection',
-                     'ProteinDetectionHypothesis', 'ProteinAmbiguityGroup',
-    ].to_set
-
-    @@_element_handlers = Xml::XML._element_handlers.dup
-    @@_element_handlers.merge!({
-        "Modification": Xml::XML::Promote_empty_parameter_to_name,
-        "SpectrumIDFormat": Xml::XML::Promote_empty_parameter_to_name,
-        "FileFormat": Xml::XML::Promote_empty_parameter_to_name,
-        "Role": Xml::XML::Promote_empty_parameter_to_name
-    })
-
     def initialize(...)
       __init__(...)
     end
   
     def __init__(*args, **kwargs)
+      @file_format ||= 'mzIdentML'
+      @_root_element ||= 'MzIdentML'
+      @_default_schema ||= Mzid_schema_defaults
+      @_default_version ||= '1.1.0'
+      @_default_iter_tag ||= 'SpectrumIdentificationResult'
+      @_structures_to_flatten ||= ['Fragmentation'].to_set
+      @_indexed_tags ||= ['SpectrumIdentificationResult', 'SpectrumIdentificationItem',
+                       'SearchDatabase', 'SourceFile', 'SpectraData', 'Sample',
+                       'DBSequence',  'Peptide', 'PeptideEvidence',
+                       'Measure', 'TranslationTable', 'MassTable', 'Enzyme',
+                       'Organization', 'AnalysisSoftware', 'BibliographicReference', 'Person', 'Provider',
+                       'SpectrumIdentificationList', 'SpectrumIdentificationProtocol', 'SpectrumIdentification',
+                       'ProteinDetectionList', 'ProteinDetectionProtocol', 'ProteinDetection',
+                       'ProteinDetectionHypothesis', 'ProteinAmbiguityGroup',
+      ].to_set
+  
+      @_element_handlers ||= Xml::XML._element_handlers.dup
+      @_element_handlers.merge!({
+          "Modification": Xml::XML::Promote_empty_parameter_to_name,
+          "SpectrumIDFormat": Xml::XML::Promote_empty_parameter_to_name,
+          "FileFormat": Xml::XML::Promote_empty_parameter_to_name,
+          "Role": Xml::XML::Promote_empty_parameter_to_name
+      })
+  
       kwargs['retrieve_refs'] = true if kwargs.include?('retrieve_refs').!
+      super
     end
 
     def _get_info_smart(element, **kwargs)
@@ -93,7 +94,7 @@ module Mzid
     MzIdentML.new(source, **kwargs).get_by_id(elem_id, **kwargs)
   end
   
-  Chain = ChainBase._make_chain(MzIdentML)
+  Chain = File_helpers::ChainBase._make_chain(MzIdentML)
   
   @is_decoy = lambda do |psm, prefix: nil|
     psm['SpectrumIdentificationItem'].all{ |sii| sii['PeptideEvidenceRef'].all{ |pe| ['', 0, nil, false, [], {}].include?(pe['isDecoy']).! } }

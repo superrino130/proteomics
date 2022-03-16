@@ -36,8 +36,9 @@ require 'numpy'
 
 # from .structures import PyteomicsError
 # from .utils import add_metaclass
-require './rbteomics/auxiliary/structures'
-require './rbteomics/auxiliary/utils'
+require_relative 'structures'
+require_relative 'utils'
+# require_relative '../xml'
 require "pathname"
 
 module File_helpers
@@ -1002,9 +1003,9 @@ module File_helpers
   module TaskMappingMixin
     include NoOpBaseReader
     def __init__(*args, **kwargs)
-      @_queue_size = kwargs.delete('queue_size') || QUEUE_SIZE
-      @_queue_timeout = kwargs.delete('timeout') || QUEUE_TIMEOUT
-      @_nproc = kwargs.delete('processes') || NPROC
+      @_queue_size ||= kwargs.delete('queue_size') || QUEUE_SIZE
+      @_queue_timeout ||= kwargs.delete('timeout') || QUEUE_TIMEOUT
+      @_nproc ||= kwargs.delete('processes') || NPROC
       super
     end
   

@@ -1,9 +1,12 @@
 require 'minitest/autorun'
 require_relative '../rbteomics/mzid'
+require_relative '../rbteomics/xml'
 require_relative '../rbteomics/auxiliary/structures'
+require_relative '../rbteomics/auxiliary/file_helpers'
 require_relative 'data'
 
 class TestMzid < Minitest::Test
+  include Xml
   def setup
     @maxDiff = nil
     @path = 'tests/test.mzid'
