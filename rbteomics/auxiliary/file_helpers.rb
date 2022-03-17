@@ -146,9 +146,9 @@ module File_helpers
     include NoOpBaseReader
     module_function
     def __init__(*args, **kwargs)
-      @_func = kwargs.delete('parser_func')
-      @_args = args
-      @_kwargs = kwargs
+      @_func ||= kwargs.delete('parser_func')
+      @_args ||= args
+      @_kwargs ||= kwargs
       reset() if self.class == IteratorContextManager
       super
     end
@@ -196,26 +196,27 @@ module File_helpers
   
   # @add_metaclass(ABCMeta)
   module FileReader
+    include IteratorContextManager
     module_function
-    prepend IteratorContextManager
     def __init__(source, **kwargs)
       func = kwargs['parser_func']
       super(*kwargs['args'], 'parser_func' => func, **kwargs['kwargs'])
-      @_pass_file = kwargs['pass_file']
-      @_source_init = source
-      @_mode = kwargs['mode']
-      @_encoding = kwargs['encoding']
-      reset(self)
+      @_pass_file ||= kwargs['pass_file']
+      @_source_init ||= source
+      @_mode ||= kwargs['mode']
+      @_encoding ||= kwargs['encoding']
+      reset
     end
   
-    def reset(cls)
-      if cls.respond_to?(:_source)
+    def reset
+      if self.respond_to?(:_source)
         @_source.__exit__(nil, nil, nil)
       end
       @_source = File_obj.new(@_source_init, @_mode, encoding: @_encoding).lines.readlines
       begin
         if @_pass_file.!
-          @_reader = @_func.call(@_source, *@_args, **@_kwargs)
+          # @_reader = @_func.call(@_source, *@_args, **@_kwargs)
+          @_reader = @_func.call(@_source, **@_kwargs)
         else
           @_reader = @_func.call(*@_args, **@_kwargs)
         end
@@ -442,7 +443,7 @@ module File_helpers
       end
       @_offset_index = nil
       if (kwargs.delete('_skip_index') || false).!
-          @_offset_index = build_byte_index()
+          @_offset_index = self.build_byte_index()
       end
     end
   

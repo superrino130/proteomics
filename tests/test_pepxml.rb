@@ -14,7 +14,7 @@ require 'set'
 class TestPepxml < Minitest::Test
   def setup
     @maxDiff = nil
-    @path = 'test.pep.xml'
+    @path = 'tests/test.pep.xml'
 
     @_kw = {'full_output' => false, 'fdr' => 1,
       'key' =>  lambda { |x| x['search_hit'].map{ |sh| [sh['search_score']['expect'], 1].min } }

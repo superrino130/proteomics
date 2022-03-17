@@ -145,25 +145,25 @@ module Xml
         'args' => (@_default_iter_path || @_default_iter_tag), 'kwargs' => kwargs)
       iterative = @_iterative if iterative.nil?
       if iterative.nil?.!
-        @_tree = nil
+        @_tree ||= nil
       else
         build_tree()
       end
       if build_id_cache
         build_id_cache()
       else
-        @_id_dict = nil
+        @_id_dict ||= nil
       end
   
-      @version_info = _get_version_info()
+      @version_info ||= _get_version_info()
       if read_schema.nil?.!
-        @_read_schema = read_schema
+        @_read_schema ||= read_schema
       end
-      @schema_info = _get_schema_info(read_schema: read_schema)
+      @schema_info ||= _get_schema_info(read_schema: read_schema)
   
-      @_converters_items = @_converters
-      @_huge_tree = kwargs['huge_tree'] || @_huge_tree
-      @_retrieve_refs_enabled = kwargs['retrieve_refs']
+      @_converters_items ||= @_converters
+      @_huge_tree ||= kwargs['huge_tree'] || @_huge_tree
+      @_retrieve_refs_enabled ||= kwargs['retrieve_refs']
     end
   
     def __reduce_ex__(protocol)
@@ -186,13 +186,24 @@ module Xml
     end
   
     #@_keepstate
-    def _get_version_info
+    def in_get_version_info
       # etree.iterparse(@_source, 'events' => ['start'], 'remove_comments' => true, 'huge_tree' => @_huge_tree).each do |_, elem|
       #   if _local_name(elem) == @_root_element
       #     return [elem.attrib.get('version'),
       #     elem.attrib.get(elem.nsmap.include?('xis') ? '{{{}}}'.format(elem.nsmap['xsi']) : '') + @_schema_location_param]
       #   end
       # end
+      doc = REXML::Document.new(@_source)
+      REXML::XPath.match(doc, 'events' => ['start'], 'remove_comments' => true, 'huge_tree' => @_huge_tree).each do |_, elem|
+        if _local_name(elem) == @_root_element
+          return [elem.attrib.get('version'),
+          elem.attrib.get(elem.nsmap.include?('xis') ? '{{{}}}'.format(elem.nsmap['xsi']) : '') + @_schema_location_param]
+        end
+      end
+    end
+    def _get_version_info
+      _keepstate_method(:in_get_version_info)
+      in_get_version_info
     end
   
     #@_keepstate
@@ -235,7 +246,7 @@ module Xml
       ret
     end
     def _get_schema_info(read_schema: true)
-      _keepstate(:in_get_schema_info)
+      _keepstate_method(:in_get_schema_info)
       in_get_schema_info(read_schema: read_schema)
     end
   
@@ -403,7 +414,7 @@ module Xml
       @_tree = etree.parse(@_source, 'parser' => ps)
     end
     def build_tree
-      _keepstate(:in_build_tree)
+      _keepstate_method(:in_build_tree)
       in_build_tree
     end
   
@@ -416,7 +427,7 @@ module Xml
     end
   
     Set_Iterfind = lambda do |path, **kwargs|
-      Iterfind.new(path, **kwargs)
+      Iterfind.__init__(path, **kwargs)
     end
   
     #@_keepstate
@@ -495,7 +506,7 @@ module Xml
       end
     end
     def _iterfind_impl(path, **kwargs)
-      _keepstate(:in_iterfind_impl)
+      _keepstate_method(:in_iterfind_impl)
       in_iterfind_impl
     end
   
@@ -521,7 +532,7 @@ module Xml
       @_id_dict = id_dict
     end
     def build_id_cache
-      _keepstate(:in_build_id_cache)
+      _keepstate_method(:in_build_id_cache)
       in_build_id_cache
     end
   
@@ -555,7 +566,7 @@ module Xml
       _get_info_smart(elem, **kwargs)
     end
     def get_by_id(elem_id, **kwargs)
-      _keepstate(:in_get_by_id)
+      _keepstate_method(:in_get_by_id)
       in_get_by_id(elem_id, **kwargs)
     end
 
@@ -603,6 +614,9 @@ module Xml
   end
   
   class ByteCountingXMLScanner < File_helpers::File_obj
+    include File_helpers
+    include Xml
+
     @@entities = {
       'quot' => '"',
       'amp' => '&',
@@ -619,6 +633,7 @@ module Xml
     def __init__(source, indexed_tags, block_size: 1000000)
       super(source, 'rb')
       @indexed_tags = ensure_bytes(indexed_tags)
+      # @indexed_tags = Xml.ensure_bytes(indexed_tags)
       @block_size = block_size
     end
 
@@ -641,8 +656,8 @@ module Xml
     def in_build_byte_index(lookup_id_key_mapping: nil)
       if lookup_id_key_mapping.nil?
         lookup_id_key_mapping = {}
-        lookup_id_key_mapping = lookup_id_key_mapping.map{ |key, value| [ensure_bytes_single(key), ensure_bytes_single(value)] }
       end
+      lookup_id_key_mapping = lookup_id_key_mapping.map{ |key, value| [ensure_bytes_single(key), ensure_bytes_single(value)] }
 
       @indexed_tags.each do |name|
         bname = ensure_bytes_single(name)
@@ -662,7 +677,7 @@ module Xml
       return indices
     end
     def build_byte_index(lookup_id_key_mapping: nil)
-      _keepstate(:in_build_byte_index)
+      File_helpers._keepstate_method(:in_build_byte_index)
       in_build_byte_index(lookup_id_key_mapping: lookup_id_key_mapping)
     end
 
@@ -671,7 +686,7 @@ module Xml
       return inst.build_byte_index()
     end
     def scan(cls, source, indexed_tags)
-      _keepstate(:in_scan)
+      _keepstate_method(:in_scan)
       in_scan(cls, source, indexed_tags)
     end
   end
@@ -843,7 +858,7 @@ module Xml
         @_source, indexed_tags: @_indexed_tags, keys: @_indexed_tag_keys)
     end
     def self._build_index
-      _keepstate(:in_build_index)
+      _keepstate_method(:in_build_index)
       in_build_index
     end
   
@@ -852,7 +867,7 @@ module Xml
       _find_by_id_no_reset(elem_id, id_key: id_key)
     end
     def _find_by_id_reset(elem_id, id_key: nil)
-      _keepstate(:in_find_by_id_reset)
+      _keepstate_method(:in_find_by_id_reset)
       in_find_by_id_reset(elem_idk id_key: id_key)
     end
   
@@ -878,7 +893,7 @@ module Xml
       data = _get_info_smart(elem, **kwargs)
     end
     def get_by_id(elem_id, **kwargs)
-      _keepstate(:in_get_by_id)
+      _keepstate_method(:in_get_by_id)
       in_get_by_id(elem_id, **kwargs)
     end
   
@@ -915,7 +930,7 @@ module Xml
     module_function
     
     def __init__(...)
-      @_index_class = File_helpers::HierarchicalOffsetIndex.__init__
+      @_index_class ||= File_helpers::HierarchicalOffsetIndex.__init__
       super
     end
     
@@ -980,10 +995,10 @@ module Xml
     module_function
   
     def __init__(parser, tag_name, **kwargs)
-      @parser = parser
-      @tag_name = tag_name
-      @config = kwargs
-      @_iterator = nil
+      @parser ||= parser
+      @tag_name ||= tag_name
+      @config ||= kwargs
+      @_iterator ||= nil
     end
   
     def __repr__
