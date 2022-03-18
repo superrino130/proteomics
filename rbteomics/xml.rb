@@ -38,9 +38,29 @@ module Xml
     if (schema_url.start_with?('http://') || schema_url.start_with?('https://') || schema_url.start_with?('file://')).!
       schema_url = 'file://' + schema_url
     end
-    URI.open(schema_url) do |schema_file|
-      doc = REXML::Document.new xml
+    doc = ''
+    begin
+      URI.open(schema_url) do |schema_file|
+        doc = REXML::Document.new schema_file
+      end
+    rescue => exception
+      begin
+        File.open('xml_schema/' + schema_url.split('/')[-1]) do |local_file|
+          doc = REXML::Document.new local_file
+        end
+      rescue => exception
+        raize "Error URI and FILE"
+      end
     end
+    types = {
+      'ints' => Set.new(['int', 'long', 'nonNegativeInteger', 'positiveInt', 'integer', 'unsignedInt']),
+      'floats' => Set.new(['float', 'double']),
+      'bools' => Set.new(['boolean']),
+      'intlists' => Set.new(['listOfIntegers']),
+      'floatlists' => Set.new(['listOfFloats']),
+      'charlists' => Set.new(['listOfChars', 'listOfCharsOrAny'])
+    }
+
   end
   
   module XMLValueConverter
@@ -187,19 +207,24 @@ module Xml
   
     #@_keepstate
     def in_get_version_info
-      # etree.iterparse(@_source, 'events' => ['start'], 'remove_comments' => true, 'huge_tree' => @_huge_tree).each do |_, elem|
-      #   if _local_name(elem) == @_root_element
-      #     return [elem.attrib.get('version'),
-      #     elem.attrib.get(elem.nsmap.include?('xis') ? '{{{}}}'.format(elem.nsmap['xsi']) : '') + @_schema_location_param]
-      #   end
-      # end
-      doc = REXML::Document.new(@_source)
-      REXML::XPath.match(doc, 'events' => ['start'], 'remove_comments' => true, 'huge_tree' => @_huge_tree).each do |_, elem|
-        if _local_name(elem) == @_root_element
-          return [elem.attrib.get('version'),
-          elem.attrib.get(elem.nsmap.include?('xis') ? '{{{}}}'.format(elem.nsmap['xsi']) : '') + @_schema_location_param]
+      version = '1.0'
+      schemaLocation = ''
+      @_source.each_with_index do |line, i|
+        next if i == 0
+        if line.include?('version')
+          version = line.match(/version=\"([0-9]|\.)*\"/)[0].sub('version=', '').gsub('"', '')
+        elsif line.include?(':schemaLocation')
+          schemaLocation = line.match(/(http|ftp).+xsd/)[0]
+          break
         end
       end
+      [version, schemaLocation]
+
+      # mzIdentML
+      # return ['1.1.0', 'https://psidev.info/sites/default/files/2017-06/mzIdentML1.1.0.xsd']
+
+      # pepxml
+      # return ['1.0', 'http://regis-web.systemsbiology.net/pepXML http://sashimi.sourceforge.net/schema_revision/pepXML/pepXML_v115.xsd']
     end
     def _get_version_info
       _keepstate_method(:in_get_version_info)
@@ -935,7 +960,7 @@ module Xml
     end
     
     def _read_byte_offsets
-      File.open(@_byte_offset_filename, 'r') do |f|
+      File.open(_byte_offset_filename, 'r') do |f|
         index = @_index_class.load(f)
         if index.schema_version.nil?
           raise TypeError("Legacy Offset Index!")

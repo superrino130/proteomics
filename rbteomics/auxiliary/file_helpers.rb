@@ -508,12 +508,16 @@ module File_helpers
   
     module_function
   
-    @@_index_class = NotImplementedError
+    def __init__(...)
+      @_index_class ||= NotImplementedError
+      super
+    end
   
     #property
     def _byte_offset_filename
       begin
-        path = _source.name      
+        # path = _source.name      
+        path = @_source.name      
       rescue => exception
         return nil
       end
