@@ -517,7 +517,7 @@ module File_helpers
     def _byte_offset_filename
       begin
         # path = _source.name      
-        path = @_source.name      
+        path = @_source_init  
       rescue => exception
         return nil
       end

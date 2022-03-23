@@ -26,11 +26,11 @@ require 'rexml/document'
 module Xml
   module_function
   def _local_name(element)
-    tag = element.tag
-    if ['', 0, nil, false, [], {}].include?(tag).! && tag[0] == '{'
-      return tag.rpartition('}')[2]
+    begin
+      return element.local_name
+    rescue => exception
+      return ''
     end
-    tag
   end
   
   def xsd_parser(schema_url)
@@ -38,7 +38,7 @@ module Xml
     if (schema_url.start_with?('http://') || schema_url.start_with?('https://') || schema_url.start_with?('file://')).!
       schema_url = 'file://' + schema_url
     end
-    doc = ''
+    schema_tree = ''
     begin
       URI.open(schema_url) do |schema_file|
         doc = REXML::Document.new schema_file
@@ -46,7 +46,7 @@ module Xml
     rescue => exception
       begin
         File.open('xml_schema/' + schema_url.split('/')[-1]) do |local_file|
-          doc = REXML::Document.new local_file
+          schema_tree = REXML::Document.new local_file
         end
       rescue => exception
         raize "Error URI and FILE"
@@ -60,7 +60,19 @@ module Xml
       'floatlists' => Set.new(['listOfFloats']),
       'charlists' => Set.new(['listOfChars', 'listOfCharsOrAny'])
     }
-
+    types.each do |k, val|
+      tuples = Set.new
+      schema_tree.elements.each do |elems|
+        elems.to_a.each do |elem|
+          if _local_name(elem) == 'attribute'
+            p elem.elements
+  
+          end
+        end
+      end
+    end
+    ret['lists'] = Set.new()
+    ret
   end
   
   module XMLValueConverter
@@ -247,24 +259,13 @@ module Xml
         schema_url = schema.split[-1]
         ret = xsd_parser(schema_url)
       rescue => e
-        if [URLError, socket.error, socket.timeout].include?(e.class)
-          warn "Can't get the #{self.file_format} schema for version `#{@version}` from <#{@schema_url}> at the moment.\nUsing defaults for {0._default_version}.\nYou can disable reading the schema by specifying `read_schema=False`."
+        # if [OpenURI::HTTPError, socket.error, socket.timeout].include?(e.class)
+        if e.instance_of?(OpenURI::HTTPError)
+            warn "Can't get the #{self.class} schema for version `#{@version}` from <#{@schema_url}> at the moment.\nUsing defaults for {0._default_version}.\nYou can disable reading the schema by specifying `read_schema=False`."
         else
-          warn "Unknown #{self.file_format} version `#{@version}`.\n" +
+          warn "Unknown #{self.class} version `#{@version}`.\n" +
             "Attempt to use schema " +
-            "information from <#{schema_url}> failed.\n" +
-            "Exception information:\n#{formt_exc()}\n" +
-            "Falling back to defaults for #{@_default_version}\n" +
-            "NOTE: This is just a warning, probably from a badly-" +
-            "generated XML file.\nYou will still most probably get " +
-            "decent results.\nLook here for suppressing warnings:\n" +
-            "http://docs.python.org/library/warnings.html#" +
-            "temporarily-suppressing-warnings\n" +
-            "You can also disable reading the schema by specifying " +
-            "`read_schema=False`.\n" +
-            "If you think this shouldn't have happened, please " +
-            "report this to\n" +
-            "http://github.com/levitsky/pyteomics/issues\n"
+            "information from <#{schema_url}> failed.\n"
         end
         ret = @_default_schema
       end
@@ -955,12 +956,14 @@ module Xml
     module_function
     
     def __init__(...)
-      @_index_class ||= File_helpers::HierarchicalOffsetIndex.__init__
+      if @_index_class.nil? || @_index_class.empty?
+        @_index_class = File_helpers::HierarchicalOffsetIndex.__init__
+      end
       super
     end
     
     def _read_byte_offsets
-      File.open(_byte_offset_filename, 'r') do |f|
+      File.open(_byte_offset_filename, 'w') do |f|
         index = @_index_class.load(f)
         if index.schema_version.nil?
           raise TypeError("Legacy Offset Index!")

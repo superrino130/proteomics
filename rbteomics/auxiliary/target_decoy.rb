@@ -214,7 +214,7 @@ module Target_decoy
         scores
       end
       def get_scores(*args, **kwargs)
-        _keepstate(:in_get_scores)
+        File_helpers._keepstate(:in_get_scores)
         in_get_scores(*args, **kwargs)
       end
   
