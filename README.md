@@ -8,6 +8,12 @@ from python 3.7 to ruby 2.7
 [jPOST - Japan Proteome Standard Repository/Database -](https://jpostdb.org/)
 
 Prof. K
+# remainder
+Exam3 (and many kinds of XML)
+# todo
++ respond ruby 3.1
++ introduce numo-narray
++ substitude matplotlib
 # gem
 次のgemが必要です。
 ```ruby

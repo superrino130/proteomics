@@ -34,11 +34,11 @@ module Xml
   end
   
   def xsd_parser(schema_url)
-    ret = {}
+    ret = Hash.new{ |h, k| h[k] = Set.new }
     if (schema_url.start_with?('http://') || schema_url.start_with?('https://') || schema_url.start_with?('file://')).!
       schema_url = 'file://' + schema_url
     end
-    schema_tree = ''
+    doc = ''
     begin
       URI.open(schema_url) do |schema_file|
         doc = REXML::Document.new schema_file
@@ -46,7 +46,7 @@ module Xml
     rescue => exception
       begin
         File.open('xml_schema/' + schema_url.split('/')[-1]) do |local_file|
-          schema_tree = REXML::Document.new local_file
+          doc = REXML::Document.new local_file.read.gsub("\n", "").gsub("\t", "")
         end
       rescue => exception
         raize "Error URI and FILE"
@@ -60,18 +60,46 @@ module Xml
       'floatlists' => Set.new(['listOfFloats']),
       'charlists' => Set.new(['listOfChars', 'listOfCharsOrAny'])
     }
-    types.each do |k, val|
-      tuples = Set.new
-      schema_tree.elements.each do |elems|
-        elems.to_a.each do |elem|
-          if _local_name(elem) == 'attribute'
-            p elem.elements
-  
+    trees = Set.new
+    doc.children.each do |ch|
+      if ch.respond_to?(:expanded_name)
+        trees << ch.expanded_name
+      end
+    end
+
+    while trees.empty?.!
+      adtrees = Set.new()
+      trees.each do |tree|
+        doc.elements.each(tree) do |chs|
+          chs.children.each do |ch|
+            if ch.respond_to?(:expanded_name)
+              adtrees << tree + '/' + ch.expanded_name if ch.name != 'attribute'
+              if ch.name == 'element'
+                if ch.attribute('maxOccurs') && ch.attributes['maxOccurs'] != '1'
+                  ret['lists'] << ch.attributes['name'] if ch.attributes['name'].nil?.!
+                end
+              elsif ch.name == 'attribute'
+                  types.each do |k, val|
+                  if ch.attribute('type') && val.include?(ch.attributes['type'].sub(ch.prefix + ':', ''))
+                    case ch.parent.local_name
+                    when 'element'
+                      ret[k] << [ch.parent.attributes['name'], ch.attributes['name']]
+                      break
+                    when 'complexType'
+                      if ch.parent.parent.local_name == 'element'
+                        ret[k] << [ch.parent.parent.attributes['name'], ch.attributes['name']]
+                        break
+                      end
+                    end
+                  end
+                end
+              end
+            end
           end
         end
       end
+      trees = adtrees
     end
-    ret['lists'] = Set.new()
     ret
   end
   
